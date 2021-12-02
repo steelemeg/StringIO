@@ -27,6 +27,7 @@ ASCII_MINUS		EQU		2Dh
 ASCII_PLUS		EQU		2Bh
 ASCII_ZERO		EQU		30h
 ASCII_NINE		EQU		39h
+MAX_POS_VALUE	EQU		2147483648
 
 .data
 greeting		BYTE	"   Welcome to the String IO Project by Megan Marshall.",13,10
@@ -41,8 +42,8 @@ greeting		BYTE	"   Welcome to the String IO Project by Megan Marshall.",13,10
 errorMessage	BYTE	"ERROR: Your entry was not valid or did not fit in a 32 byte signed integer. Please try again.",13,10,0
 ; String to store unvalidated user input. Assuming that the user will not enter more than 100 characters.
 userInput		BYTE	100 DUP(?)
-testString		BYTE	"-21474836498",0 
-inputLength		DWORD	11
+testString		BYTE	"2147483647",0 
+inputLength		DWORD	10
 validCount		DWORD	0
 validInputs		SDWORD	10 DUP(?)
 average			SDWORD	?
@@ -82,6 +83,9 @@ ReadVal	PROC
 	; If the user enters nothing (empty input), display an error and re-prompt.
 	CMP		ECX, 0
 	JE		_error
+	; Pre-check: if there are more than 11 characters, there's no way it will fit. (This allows for a sign flag)
+	CMP		ECX, 11
+	JA		_error
 	JMP		_checkSign
 	_error:
 		; TODO offsets from the stack
@@ -133,7 +137,7 @@ ReadVal	PROC
 	_processString:
 		XOR		EAX, EAX
 		LODSB
-		; Validate! Is the character a sigit between 0 and 9?
+		; Validate! Is the character a sigit between 0 and 9? In ASCII this is [30h, 39h]
 		CMP		AL, ASCII_ZERO
 		JB		_error
 		CMP		AL, ASCII_NINE
@@ -143,31 +147,25 @@ ReadVal	PROC
 		SUB		AL, 30h
 		; Stash this value in currentDigit for the time being
 		MOV		currentDigit, EAX
-		; Then multiply the existing value of EBX by 10 and add or subtrac the newest digit, depending on the sign.
+		; Then multiply the existing value of EBX by 10 and add the newest digit. 
 		MOV		EAX, EBX
 		MOV		EBX, 10
 		MUL		EBX
-
+		; Check if we've already exceeded the size limit
+		JC		_error
 		ADD		EAX, currentDigit
-
-
-		; Check if we've already exceeded the size limit. 
-		CALL	WriteDec
-		CALL	Crlf
-		CALL	WriteInt
-		Call	crlf
-		call	crlf
-		JO		_error
 		; Move the final value back into EBX and we're ready for the next digit.
-		MOV		EBX, EAX				
+		MOV		EBX, EAX
+				
 		LOOP	_processString
 
+	; TODO if there was a negative sign, flip it
 	; TODO use stack etc
 	; At this point the string has been validated and built. If there was a leading negative sign, negate the value.
 	MOV		EAX, negativeInput
 	CMP		EAX, 1
 	JE		_flipSign
-	JMP		_checkFinalSize
+	JMP		_checkPositive
 
 	_flipSign:
 		; This is a cheap trick; when the input is exactly -214748368, it was overflowing the register when negated.
@@ -175,16 +173,21 @@ ReadVal	PROC
 		DEC		EBX
 		NEG		EBX
 		DEC		EBX
+		JMP		_checkSize
 
-	_checkFinalSize:
-		; Does the final result fit in a SDWORD? Clear the carry flag first to avoid weird bugs
-		CLC
-		ADD		potentialInput, EBX
+	_checkPositive:
+		; Check if the positive value is less than 2147483648.
+		; This is not ideal, will rework if time permits. No flags were getting set when moving the value into the SDWORD, need to determine why.
+		CMP		MAX_POS_VALUE, EBX
+		JNA		_error
 
-		JO		_error		; Case where input is less than -214748368
+	; Does the final result fit in a 32 bit register?
+	_checkSize:
+		JO	_error
 
+	;TODO Check if the number fits in a 32 bit signed integer
 	;TODO increment validCount, store input, and return if the input was valid. Otherwise start over.
-
+	MOV		potentialInput, EBX
 	MOV		EAX, potentialInput
 	CALL	WriteInt
 	RET

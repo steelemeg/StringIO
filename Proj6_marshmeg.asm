@@ -33,25 +33,28 @@ greeting		BYTE	"   Welcome to the String IO Project by Megan Marshall.",13,10
 				BYTE	"-------------------------------------------------------------",13,10
 				BYTE	"**EC 1: Number each line of user input and display a running subtoatl of valid inputs.",13,10,13,10
 				BYTE	"This program will ask you for 10 signed decimal integers. ",13,10
-				BYTE	"Each integer needs to fit in a 32 bit signed register. Therefore, it should be no smaller ",13,10
+				BYTE	"Each integer needs to fit in a 32 bit signed integer. Therefore, it should be no smaller ",13,10
 				BYTE	"than -2,147,483,648 and no larger than 2,147,483,647.",13,10
 				BYTE	"Invalid entries will not be accepted!",13,10,13,10
 				BYTE	"After 10 valid entries have been provided, you will be shown all your valid inputs, their ",13,10
 				BYTE	"sum, and their average value.",13,10,13,10,0
-errorMessage	BYTE	"ERROR: Your entry was not valid or was too big. Please try again.",13,10,0
+errorMessage	BYTE	"ERROR: Your entry was not valid or did not fit in a 32 byte signed integer. Please try again.",13,10,0
 ; String to store unvalidated user input. Assuming that the user will not enter more than 100 characters.
 userInput		BYTE	100 DUP(?)
-testString		BYTE	"25913",0
-inputLength		DWORD	5
+testString		BYTE	"2147483648",0 
+inputLength		DWORD	10
 validCount		DWORD	0
 validInputs		SDWORD	10 DUP(?)
 average			SDWORD	?
-printMe			SDWORD	25913
+potentialInput	SDWORD	0
+currentDigit	DWORD	0
 negativeInput	DWORD	0
+pushedChars		DWORD	0
 
 .code
 main PROC
 	MOV		EDX, OFFSET greeting
+	; TODO replace with mDisplayString
 	CALL	WriteString
 	CALL	ReadVal
 	INVOKE  ExitProcess, 0		;exit to operating system
@@ -62,10 +65,13 @@ main ENDP
 ; effective range: -2,147,483,648 to 2,147,483,647
 ; ***************************************************************
 ReadVal	PROC
-	;TODO going to need: validCount, address of userInput, address of errorMessage, inputLength
+	;TODO going to need: validCount, address of userInput, address of errorMessage, inputLength, potentialInput, currentDigit
 	; Get the first 
 	_getInput:
 	; TODO call mGetString
+	; EBX will be used to track the value as it's validated and built.
+	MOV		EBX, 0	
+
 
 	; TODO replace with actual parameter, stack reference
 	; Use ESI for the source
@@ -80,8 +86,26 @@ ReadVal	PROC
 	_error:
 		; TODO offsets from the stack
 		; Display error message
+		; TODO replace with mDisplayString
 		MOV		EDX, OFFSET errorMessage
 		CALL	WriteString
+		; Clear off anything we pushed onto the stack as a valid character
+		; TODO use reference stack thing stuff blah;
+		; TODO oops...we don't need the stack here. save the code for now, probably gonna need it for writeVal
+		;MOV		ECX, pushedChars
+		;CMP		ECX, 0
+		;JA		_cleanUpStack
+		;JMP		_startOver
+
+		;_cleanUpStack:
+		;	POP		EAX
+		;	LOOP	_cleanUpStack
+
+		; Clear out EAX, reset potentialInput, and prompt the user for new input.
+		XOR		EAX, EAX
+		MOV		EBX, 0
+		; TODO temporary
+		RET
 		JMP		_getInput
 
 	; Check if the first character is '-' or '+'
@@ -95,9 +119,11 @@ ReadVal	PROC
 
 	_negative:
 		MOV		negativeInput, 1
+		DEC		ECX
 		JMP		_processString
 	_positive:
 		MOV		negativeInput, 0
+		DEC		ECX
 		JMP		_processString
 	_unsigned:
 		MOV		negativeInput, 0
@@ -105,8 +131,6 @@ ReadVal	PROC
 		MOV		ESI, OFFSET testString
 
 	_processString:
-		; When the loop begins, ECX = length of the integer. So it's one more than the tens place counter 
-		; i.e. when ECX is 5, it's the ten thousands place 10^4
 		XOR		EAX, EAX
 		LODSB
 		; Validate! Is the character a sigit between 0 and 9? In ASCII this is [30h, 39h]
@@ -115,14 +139,46 @@ ReadVal	PROC
 		CMP		AL, ASCII_NINE
 		JA		_error
 
-		CALL	WriteChar
-		MOV		EAX, ECX
-		CALL	WriteDec
-		CALL	Crlf
+		; If the character was valid, convert the ASCII value to hex value by subtracting 30h.
+		SUB		AL, 30h
+		; Stash this value in currentDigit for the time being
+		MOV		currentDigit, EAX
+		; Then multiply the existing value of EBX by 10 and add the newest digit. 
+		MOV		EAX, EBX
+		MOV		EBX, 10
+		MUL		EBX
+		; Check if we've already exceeded the size limit
+		JC		_error
+		ADD		EAX, currentDigit
+		; Move the final value back into EBX and we're ready for the next digit.
+		MOV		EBX, EAX
+				
 		LOOP	_processString
 
+	; TODO if there was a negative sign, flip it
+	; TODO use stack etc
+	; At this point the string has been validated and built. If there was a leading negative sign, negate the value.
+	MOV		EAX, negativeInput
+	CMP		EAX, 1
+	JE		_flipSign
+	JMP		_checkSize
+
+	_flipSign:
+		; This is a cheap trick; when the input is exactly -214748368, it was overflowing the register when negated.
+		; Workaround: decrement the unsigned value, negate it, then decrement it again. Restores the original value and avoids overflow.
+		DEC		EBX
+		NEG		EBX
+		DEC		EBX
+
+	; Does the final result fit in a 32 bit register?
+	_checkSize:
+		JO	_error
+
 	;TODO Check if the number fits in a 32 bit signed integer
-	;TODO increment validCount if the input was valid. Otherwise start over.
+	;TODO increment validCount, store input, and return if the input was valid. Otherwise start over.
+	MOV		potentialInput, EBX
+	MOV		EAX, potentialInput
+	CALL	WriteInt
 	RET
 ReadVal	ENDP
 
@@ -131,10 +187,10 @@ ReadVal	ENDP
 ; ***************************************************************
 WriteVal   PROC
 	; temp, add in parameters TODO
-	MOV		EAX, printMe
-	XOR		EDX, EDX	; clear the remainder register
-	CDQ
-	MOV		ECX, 10
+	;MOV		EAX, printMe
+	;XOR		EDX, EDX	; clear the remainder register
+	;CDQ
+	;MOV		ECX, 10
 
 	
 	RET
@@ -146,5 +202,13 @@ WriteVal   ENDP
 ArraySum	PROC
 	RET
 ArraySum	ENDP
+
+
+; ***************************************************************
+; stuff. takes sum and number of entries
+; ***************************************************************
+TruncatedAverage	PROC
+	RET
+TruncatedAverage	ENDP
 
 END main

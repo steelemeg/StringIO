@@ -41,8 +41,8 @@ greeting		BYTE	"   Welcome to the String IO Project by Megan Marshall.",13,10
 errorMessage	BYTE	"ERROR: Your entry was not valid or did not fit in a 32 byte signed integer. Please try again.",13,10,0
 ; String to store unvalidated user input. Assuming that the user will not enter more than 100 characters.
 userInput		BYTE	100 DUP(?)
-testString		BYTE	"2147483648",0 
-inputLength		DWORD	10
+testString		BYTE	"-2147483648",0 
+inputLength		DWORD	11
 validCount		DWORD	0
 validInputs		SDWORD	10 DUP(?)
 average			SDWORD	?
@@ -133,7 +133,7 @@ ReadVal	PROC
 	_processString:
 		XOR		EAX, EAX
 		LODSB
-		; Validate! Is the character a sigit between 0 and 9? In ASCII this is [30h, 39h]
+		; Validate! Is the character a sigit between 0 and 9?
 		CMP		AL, ASCII_ZERO
 		JB		_error
 		CMP		AL, ASCII_NINE
@@ -150,12 +150,13 @@ ReadVal	PROC
 		; Check if we've already exceeded the size limit
 		JC		_error
 		ADD		EAX, currentDigit
+		JC		_error
+		JO		_error
 		; Move the final value back into EBX and we're ready for the next digit.
 		MOV		EBX, EAX
 				
 		LOOP	_processString
 
-	; TODO if there was a negative sign, flip it
 	; TODO use stack etc
 	; At this point the string has been validated and built. If there was a leading negative sign, negate the value.
 	MOV		EAX, negativeInput
@@ -170,13 +171,15 @@ ReadVal	PROC
 		NEG		EBX
 		DEC		EBX
 
-	; Does the final result fit in a 32 bit register?
 	_checkSize:
-		JO	_error
+		; Does the final result fit in a SDWORD? Clear the carry flag first to avoid weird bugs
+		CLC
+		ADD		potentialInput, EBX
 
-	;TODO Check if the number fits in a 32 bit signed integer
+		JO		_error		; Case where input is less than -214748368
+
 	;TODO increment validCount, store input, and return if the input was valid. Otherwise start over.
-	MOV		potentialInput, EBX
+
 	MOV		EAX, potentialInput
 	CALL	WriteInt
 	RET

@@ -22,8 +22,11 @@ mDisplayString MACRO printTarget
 ;Print the string which is stored in a specified memory location (input parameter, by reference).
 ENDM
 
-; constants
-MAXSIZE	= 100
+; Constants. Defining bounds of valid ASCII inputs so I don't have ambiguous hex values in my code.
+ASCII_MINUS		EQU		2Dh
+ASCII_PLUS		EQU		2Bh
+ASCII_ZERO		EQU		30h
+ASCII_NINE		EQU		39h
 
 .data
 greeting		BYTE	"   Welcome to the String IO Project by Megan Marshall.",13,10
@@ -35,15 +38,16 @@ greeting		BYTE	"   Welcome to the String IO Project by Megan Marshall.",13,10
 				BYTE	"Invalid entries will not be accepted!",13,10,13,10
 				BYTE	"After 10 valid entries have been provided, you will be shown all your valid inputs, their ",13,10
 				BYTE	"sum, and their average value.",13,10,13,10,0
+errorMessage	BYTE	"ERROR: Your entry was not valid or was too big. Please try again.",13,10,0
 ; String to store unvalidated user input. Assuming that the user will not enter more than 100 characters.
 userInput		BYTE	100 DUP(?)
 testString		BYTE	"25913",0
-testLength		DWORD	5
-validBool		DWORD	0
+inputLength		DWORD	5
 validCount		DWORD	0
 validInputs		SDWORD	10 DUP(?)
 average			SDWORD	?
 printMe			SDWORD	25913
+negativeInput	DWORD	0
 
 .code
 main PROC
@@ -58,23 +62,67 @@ main ENDP
 ; effective range: -2,147,483,648 to 2,147,483,647
 ; ***************************************************************
 ReadVal	PROC
+	;TODO going to need: validCount, address of userInput, address of errorMessage, inputLength
 	; Get the first 
+	_getInput:
+	; TODO call mGetString
+
 	; TODO replace with actual parameter, stack reference
 	; Use ESI for the source
 	MOV		ESI, OFFSET testString
 	; Replace with the number of bytes written by mGetString
-	MOV		ECX, testLength
-	; TODO add validation
-	; TODO ascii 48-57 = 0-9, 45 is -, 43 is +. in hex, 30-39 0-9, 2d is -, 2b is +
-	_loopThroughString:
-		; When the loop begins, ECX = length of the integer. So it's one more than the tens place counter
+	; TODO stack
+	MOV		ECX, inputLength
+	; If the user enters nothing (empty input), display an error and re-prompt.
+	CMP		ECX, 0
+	JE		_error
+	JMP		_checkSign
+	_error:
+		; TODO offsets from the stack
+		; Display error message
+		MOV		EDX, OFFSET errorMessage
+		CALL	WriteString
+		JMP		_getInput
+
+	; Check if the first character is '-' or '+'
+	_checkSign:
 		LODSB
+		CMP		AL, ASCII_MINUS
+		JE		_negative
+		CMP		AL, ASCII_PLUS
+		JE		_positive
+		JMP		_unsigned
+
+	_negative:
+		MOV		negativeInput, 1
+		JMP		_processString
+	_positive:
+		MOV		negativeInput, 0
+		JMP		_processString
+	_unsigned:
+		MOV		negativeInput, 0
+		; If the first character wasn't '-' or '+', reset ESI to the first character in the string.
+		MOV		ESI, OFFSET testString
+
+	_processString:
+		; When the loop begins, ECX = length of the integer. So it's one more than the tens place counter 
+		; i.e. when ECX is 5, it's the ten thousands place 10^4
+		XOR		EAX, EAX
+		LODSB
+		; Validate! Is the character a sigit between 0 and 9? In ASCII this is [30h, 39h]
+		CMP		AL, ASCII_ZERO
+		JB		_error
+		CMP		AL, ASCII_NINE
+		JA		_error
+
 		CALL	WriteChar
 		MOV		EAX, ECX
 		CALL	WriteDec
 		CALL	Crlf
-		LOOP _loopThroughString
+		LOOP	_processString
 
+	;TODO Check if the number fits in a 32 bit signed integer
+	;TODO increment validCount if the input was valid. Otherwise start over.
 	RET
 ReadVal	ENDP
 

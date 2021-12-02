@@ -1,4 +1,4 @@
-Microsoft (R) Macro Assembler Version 14.29.30133.0	    12/02/21 16:24:35
+Microsoft (R) Macro Assembler Version 14.29.30133.0	    12/02/21 16:45:47
 User IO (Proj6_marshmeg.asm				     Page 1 - 1
 
 
@@ -48,7 +48,7 @@ Microsoft (R) Macro Assembler Version 14.29.30133.0	    12/02/21 16:24:35
  = 0000002B			ASCII_PLUS		EQU		2Bh
  = 00000030			ASCII_ZERO		EQU		30h
  = 00000039			ASCII_NINE		EQU		39h
- = 80000000			MAX_POS_VALUE	EQU		2147483648
+ = 7FFFFFFF			MAX_POS_VALUE	EQU		2147483647
 
  00000000			.data
  00000000 20 20 20 57 65	greeting		BYTE	"   Welcome to the String IO Project by Megan Marshall.",13,10
@@ -195,8 +195,8 @@ Microsoft (R) Macro Assembler Version 14.29.30133.0	    12/02/21 16:24:35
  000002A6  00000064 [		userInput		BYTE	100 DUP(?)
 	    00
 	   ]
- 0000030A 32 31 34 37 34	testString		BYTE	"2147483647",0 
-	   38 33 36 34 37
+ 0000030A 32 31 34 37 34	testString		BYTE	"2147483648",0 
+	   38 33 36 34 38
 	   00
  00000315 0000000A		inputLength		DWORD	10
  00000319 00000000		validCount		DWORD	0
@@ -296,10 +296,10 @@ Microsoft (R) Macro Assembler Version 14.29.30133.0	    12/02/21 16:24:35
 						; If the first character wasn't '-' or '+', reset ESI to the first character in the string.
  00000075  BE 0000030A R			MOV		ESI, OFFSET testString
 
- 0000007A				_processString:
+ 0000007A			_processString:
  0000007A  33 C0				XOR		EAX, EAX
  0000007C  AC					LODSB
-						; Validate! Is the character a sigit between 0 and 9? In ASCII this is [30h, 39h]
+						; Validate! Is the character a sigit between 0 and 9?
  0000007D  3C 30				CMP		AL, ASCII_ZERO
  0000007F  72 B1				JB		_error
  00000081  3C 39				CMP		AL, ASCII_NINE
@@ -309,57 +309,59 @@ Microsoft (R) Macro Assembler Version 14.29.30133.0	    12/02/21 16:24:35
  00000085  2C 30				SUB		AL, 30h
 						; Stash this value in currentDigit for the time being
  00000087  A3 0000034D R			MOV		currentDigit, EAX
-						; Then multiply the existing value of EBX by 10 and add the newest digit. 
+						; Then multiply the existing value of EBX by 10 and add or subtrac the newest digit, depending on the sign.
  0000008C  8B C3				MOV		EAX, EBX
  0000008E  BB 0000000A				MOV		EBX, 10
  00000093  F7 E3				MUL		EBX
-						; Check if we've already exceeded the size limit
- 00000095  72 9B				JC		_error
- 00000097  03 05 0000034D R			ADD		EAX, currentDigit
+ 00000095  83 3D 00000351 R			CMP		negativeInput, 1
+	   01
+ 0000009C  74 02				JE		_subtractNextDigit
+ 0000009E  EB 0A				JMP		_addNextDigit
+						
+ 000000A0					_subtractNextDigit:
+ 000000A0  2B 05 0000034D R				SUB		EAX, currentDigit
+ 000000A6  70 8A					JO		_error
+ 000000A8  EB 0A					JMP		_nextDigit
+
+ 000000AA					_addNextDigit:
+ 000000AA  03 05 0000034D R				ADD		EAX, currentDigit
+ 000000B0  72 80					JC		_error
+ 000000B2  EB 00					JMP		_nextDigit
+
+						;_checkCurrentSize:
+							; Check if we've already exceeded the size limit
+							;JO		_error
 						; Move the final value back into EBX and we're ready for the next digit.
- 0000009D  8B D8				MOV		EBX, EAX
+ 000000B4					_nextDigit:
+ 000000B4  8B D8				MOV		EBX, EAX
 								
- 0000009F  E2 D9				LOOP	_processString
+ 000000B6  E2 C2				LOOP	_processString
 
-					; TODO if there was a negative sign, flip it
-					; TODO use stack etc
-					; At this point the string has been validated and built. If there was a leading negative sign, negate the value.
- 000000A1  A1 00000351 R		MOV		EAX, negativeInput
- 000000A6  83 F8 01			CMP		EAX, 1
- 000000A9  74 02			JE		_flipSign
- 000000AB  EB 06			JMP		_checkPositive
+					; At this point the string has been validated and an integer equivalent built in EBX.
 
- 000000AD				_flipSign:
-						; This is a cheap trick; when the input is exactly -214748368, it was overflowing the register when negated.
-						; Workaround: decrement the unsigned value, negate it, then decrement it again. Restores the original value and avoids overflow.
- 000000AD  4B					DEC		EBX
- 000000AE  F7 DB				NEG		EBX
- 000000B0  4B					DEC		EBX
- 000000B1  EB 06				JMP		_checkSize
+ 000000B8				_checkFinalSize:
+						; Does the final result fit in a SDWORD? Clear the carry flag first to avoid weird bugs
+ 000000B8  F8					CLC
+ 000000B9  01 1D 00000349 R			ADD		potentialInput, EBX
 
- 000000B3				_checkPositive:
-						; Check if the positive value is less than 2147483648.
-						; This is not ideal, will rework if time permits. No flags were getting set when moving the value into the SDWORD, need to determine why.
-						CMP		MAX_POS_VALUE, EBX
-Proj6_marshmeg.asm(181) : error A2001:immediate operand not allowed
- 000000B3  0F 86 FFFFFF79			JNA		_error
+ 000000BF  0F 80 FFFFFF6D			JO		_error		
+ 000000C5  A1 00000351 R			MOV		EAX, negativeInput
+ 000000CA  83 F8 01				CMP		EAX, 1
+ 000000CD  74 0C				JE		_saveResult
+ 000000CF  81 FB 7FFFFFFF			CMP		EBX, MAX_POS_VALUE
+ 000000D5  0F 87 FFFFFF57			JA		_error
 
-					; Does the final result fit in a 32 bit register?
- 000000B9				_checkSize:
- 000000B9  0F 80 FFFFFF73			JO	_error
-
-					;TODO Check if the number fits in a 32 bit signed integer
 					;TODO increment validCount, store input, and return if the input was valid. Otherwise start over.
- 000000BF  89 1D 00000349 R		MOV		potentialInput, EBX
- 000000C5  A1 00000349 R		MOV		EAX, potentialInput
- 000000CA  E8 00000000 E		CALL	WriteInt
- 000000CF  C3				RET
- 000000D0			ReadVal	ENDP
+ 000000DB				_saveResult:
+ 000000DB  A1 00000349 R			MOV		EAX, potentialInput
+ 000000E0  E8 00000000 E			CALL	WriteInt
+ 000000E5  C3				RET
+ 000000E6			ReadVal	ENDP
 
 				; ***************************************************************
 				; stuff
 				; ***************************************************************
- 000000D0			WriteVal   PROC
+ 000000E6			WriteVal   PROC
 					; temp, add in parameters TODO
 					;MOV		EAX, printMe
 					;XOR		EDX, EDX	; clear the remainder register
@@ -367,26 +369,26 @@ Proj6_marshmeg.asm(181) : error A2001:immediate operand not allowed
 					;MOV		ECX, 10
 
 					
- 000000D0  C3				RET
- 000000D1			WriteVal   ENDP
+ 000000E6  C3				RET
+ 000000E7			WriteVal   ENDP
 
 				; ***************************************************************
 				; stuff. takes array reference and number of entries to sum (for EC 1)
 				; ***************************************************************
- 000000D1			ArraySum	PROC
- 000000D1  C3				RET
- 000000D2			ArraySum	ENDP
+ 000000E7			ArraySum	PROC
+ 000000E7  C3				RET
+ 000000E8			ArraySum	ENDP
 
 
 				; ***************************************************************
 				; stuff. takes sum and number of entries
 				; ***************************************************************
- 000000D2			TruncatedAverage	PROC
- 000000D2  C3				RET
- 000000D3			TruncatedAverage	ENDP
+ 000000E8			TruncatedAverage	PROC
+ 000000E8  C3				RET
+ 000000E9			TruncatedAverage	ENDP
 
 				END main
-Microsoft (R) Macro Assembler Version 14.29.30133.0	    12/02/21 16:24:35
+Microsoft (R) Macro Assembler Version 14.29.30133.0	    12/02/21 16:45:47
 User IO (Proj6_marshmeg.asm				     Symbols 2 - 1
 
 
@@ -489,14 +491,14 @@ Segments and Groups:
 FLAT . . . . . . . . . . . . . .	GROUP
 STACK  . . . . . . . . . . . . .	32 Bit	 00001000 Para	  Stack	  'STACK'	 
 _DATA  . . . . . . . . . . . . .	32 Bit	 00000359 Para	  Public  'DATA'	
-_TEXT  . . . . . . . . . . . . .	32 Bit	 000000D3 Para	  Public  'CODE'	
+_TEXT  . . . . . . . . . . . . .	32 Bit	 000000E9 Para	  Public  'CODE'	
 
 
 Procedures, parameters, and locals:
 
                 N a m e                 Type     Value    Attr
 
-ArraySum . . . . . . . . . . . .	P Near	 000000D1 _TEXT	Length= 00000001 Public STDCALL
+ArraySum . . . . . . . . . . . .	P Near	 000000E7 _TEXT	Length= 00000001 Public STDCALL
 CloseFile  . . . . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External STDCALL
 CloseHandle  . . . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External STDCALL
 Clrscr . . . . . . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External STDCALL
@@ -560,7 +562,7 @@ ReadInt  . . . . . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External
 ReadKeyFlush . . . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External STDCALL
 ReadKey  . . . . . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External STDCALL
 ReadString . . . . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External STDCALL
-ReadVal  . . . . . . . . . . . .	P Near	 00000016 _TEXT	Length= 000000BA Public STDCALL
+ReadVal  . . . . . . . . . . . .	P Near	 00000016 _TEXT	Length= 000000D0 Public STDCALL
   _getInput  . . . . . . . . . .	L Near	 00000016 _TEXT	
   _error . . . . . . . . . . . .	L Near	 00000032 _TEXT	
   _checkSign . . . . . . . . . .	L Near	 00000046 _TEXT	
@@ -568,9 +570,11 @@ ReadVal  . . . . . . . . . . . .	P Near	 00000016 _TEXT	Length= 000000BA Public 
   _positive  . . . . . . . . . .	L Near	 0000005E _TEXT	
   _unsigned  . . . . . . . . . .	L Near	 0000006B _TEXT	
   _processString . . . . . . . .	L Near	 0000007A _TEXT	
-  _flipSign  . . . . . . . . . .	L Near	 000000AD _TEXT	
-  _checkPositive . . . . . . . .	L Near	 000000B3 _TEXT	
-  _checkSize . . . . . . . . . .	L Near	 000000B9 _TEXT	
+  _subtractNextDigit . . . . . .	L Near	 000000A0 _TEXT	
+  _addNextDigit  . . . . . . . .	L Near	 000000AA _TEXT	
+  _nextDigit . . . . . . . . . .	L Near	 000000B4 _TEXT	
+  _checkFinalSize  . . . . . . .	L Near	 000000B8 _TEXT	
+  _saveResult  . . . . . . . . .	L Near	 000000DB _TEXT	
 SetConsoleCursorInfo . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External STDCALL
 SetConsoleCursorPosition . . . .	P Near	 00000000 FLAT	Length= 00000000 External STDCALL
 SetConsoleMode . . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External STDCALL
@@ -590,7 +594,7 @@ Str_length . . . . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External
 Str_trim . . . . . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External STDCALL
 Str_ucase  . . . . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External STDCALL
 SystemTimeToFileTime . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External STDCALL
-TruncatedAverage . . . . . . . .	P Near	 000000D2 _TEXT	Length= 00000001 Public STDCALL
+TruncatedAverage . . . . . . . .	P Near	 000000E8 _TEXT	Length= 00000001 Public STDCALL
 WaitMsg  . . . . . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External STDCALL
 WriteBinB  . . . . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External STDCALL
 WriteBin . . . . . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External STDCALL
@@ -608,7 +612,7 @@ WriteStackFrameName  . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External
 WriteStackFrame  . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External STDCALL
 WriteString  . . . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External STDCALL
 WriteToFile  . . . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External STDCALL
-WriteVal . . . . . . . . . . . .	P Near	 000000D0 _TEXT	Length= 00000001 Public STDCALL
+WriteVal . . . . . . . . . . . .	P Near	 000000E6 _TEXT	Length= 00000001 Public STDCALL
 WriteWindowsMsg  . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External STDCALL
 main . . . . . . . . . . . . . .	P Near	 00000000 _TEXT	Length= 00000016 Public STDCALL
 printf . . . . . . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External C
@@ -706,7 +710,7 @@ KEY_EVENT  . . . . . . . . . . .	Number	 00000001h
 KEY_MASKS  . . . . . . . . . . .	Number	 0000001Fh   
 LEFT_ALT_PRESSED . . . . . . . .	Number	 00000002h   
 LEFT_CTRL_PRESSED  . . . . . . .	Number	 00000008h   
-MAX_POS_VALUE  . . . . . . . . .	Number	 -80000000h   
+MAX_POS_VALUE  . . . . . . . . .	Number	 7FFFFFFFh   
 MB_ABORTRETRYIGNORE  . . . . . .	Number	 00000002h   
 MB_APPLMODAL . . . . . . . . . .	Number	 00000000h   
 MB_CANCELTRYCONTINUE . . . . . .	Number	 00000006h   
@@ -866,4 +870,4 @@ wsprintf . . . . . . . . . . . .	Text   	 wsprintfA
 yellow . . . . . . . . . . . . .	Number	 0000000Eh   
 
 	   0 Warnings
-	   1 Errors
+	   0 Errors

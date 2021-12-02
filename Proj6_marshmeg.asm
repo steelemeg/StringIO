@@ -41,8 +41,8 @@ greeting		BYTE	"   Welcome to the String IO Project by Megan Marshall.",13,10
 errorMessage	BYTE	"ERROR: Your entry was not valid or did not fit in a 32 byte signed integer. Please try again.",13,10,0
 ; String to store unvalidated user input. Assuming that the user will not enter more than 100 characters.
 userInput		BYTE	100 DUP(?)
-testString		BYTE	"-2147483648",0 
-inputLength		DWORD	11
+testString		BYTE	"2147483648",0 
+inputLength		DWORD	10
 validCount		DWORD	0
 validInputs		SDWORD	10 DUP(?)
 average			SDWORD	?
@@ -143,35 +143,52 @@ ReadVal	PROC
 		SUB		AL, 30h
 		; Stash this value in currentDigit for the time being
 		MOV		currentDigit, EAX
-		; Then multiply the existing value of EBX by 10 and add the newest digit. 
+		; Then multiply the existing value of EBX by 10 and add or subtrac the newest digit, depending on the sign.
 		MOV		EAX, EBX
 		MOV		EBX, 10
 		MUL		EBX
-		; Check if we've already exceeded the size limit
-		JC		_error
-		ADD		EAX, currentDigit
-		JC		_error
-		JO		_error
+		CMP		negativeInput, 1
+		JE		_subtractNextDigit
+		JMP		_addNextDigit
+		
+		_subtractNextDigit:
+			SUB		EAX, currentDigit
+			JO		_error
+			JMP		_nextDigit
+
+		_addNextDigit:
+			ADD		EAX, currentDigit
+			CALL	WriteInt
+			Call	Crlf
+			Call	WriteDec
+			Call	Crlf
+			JC		_error
+			JMP		_nextDigit
+
+		;_checkCurrentSize:
+			; Check if we've already exceeded the size limit
+			;JO		_error
 		; Move the final value back into EBX and we're ready for the next digit.
+		_nextDigit:
 		MOV		EBX, EAX
 				
 		LOOP	_processString
 
 	; TODO use stack etc
 	; At this point the string has been validated and built. If there was a leading negative sign, negate the value.
-	MOV		EAX, negativeInput
-	CMP		EAX, 1
-	JE		_flipSign
-	JMP		_checkSize
+	;MOV		EAX, negativeInput
+	;CMP		EAX, 1
+	;JE		_flipSign
+	;JMP		_checkSize
 
-	_flipSign:
+	;_flipSign:
 		; This is a cheap trick; when the input is exactly -214748368, it was overflowing the register when negated.
 		; Workaround: decrement the unsigned value, negate it, then decrement it again. Restores the original value and avoids overflow.
-		DEC		EBX
-		NEG		EBX
-		DEC		EBX
+		;DEC		EBX
+		;NEG		EBX
+		;DEC		EBX
 
-	_checkSize:
+	_checkFinalSize:
 		; Does the final result fit in a SDWORD? Clear the carry flag first to avoid weird bugs
 		CLC
 		ADD		potentialInput, EBX

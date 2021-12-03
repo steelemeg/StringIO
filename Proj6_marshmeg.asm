@@ -12,18 +12,28 @@ TITLE User IO (Proj6_marshmeg.asm)
 INCLUDE Irvine32.inc
 
 ; Macros!
-mGetString MACRO lineNumber, promptMessage, userInput, inputLength, bytesRead
+mGetString MACRO promptMessage, inputString, maxLength, bytesRead
 ; Display a prompt (input parameter, by reference), then get the user’s keyboard input into a memory location (output parameter, by reference).
 ;You may also need to provide a count (input parameter, by value) for the length of input string you can accommodate and a provide a number of bytes read 
 ;(output parameter, by reference) by the macro.
-	; TODO add line number from WriteVal
-	MOV		EDX, OFFSET	promptMessage
+	
+	PUSH	EAX
+	PUSH	ECX
+	PUSH	EDX
+
+	MOV		EDX, promptMessage
 	CALL	WriteString
-	MOV		ECX, inputLength
-	MOV		EDX, OFFSET userInput
+	MOV		ECX, maxLength
+	MOV		EDX, inputString
 	CALL	ReadString
 	; Track how many characters the user entered. Note this is +1 for null terminated.
-	MOV		bytesRead, EAX		
+	;MOV		bytesRead, EAX	
+	MOV		EDX, bytesRead
+	MOV		[EDX], EAX
+
+	POP		EDX
+	POP		ECX
+	POP		EAX
 ENDM
 
 mDisplayString MACRO printTarget
@@ -39,6 +49,7 @@ ASCII_ZERO		EQU		30h
 ASCII_NINE		EQU		39h
 ASCII_BASE		EQU		30h
 MAX_POS_VALUE	EQU		2147483647
+MAX_BUFFER		EQU		100
 
 .data
 greeting		BYTE	"   Welcome to the String IO Project by Megan Marshall.",13,10
@@ -50,13 +61,14 @@ greeting		BYTE	"   Welcome to the String IO Project by Megan Marshall.",13,10
 				BYTE	"Invalid entries will not be accepted!",13,10,13,10
 				BYTE	"After 10 valid entries have been provided, you will be shown all your valid inputs, their ",13,10
 				BYTE	"sum, and their average value.",13,10,13,10,0
-promptForInput	BYTE	"Please enter a signed integer: ",0
+promptForInput	BYTE	". Please enter a signed integer: ",0
 errorMessage	BYTE	"ERROR: Your entry was not valid or did not fit in a 32 byte signed integer. Please try again.",13,10,0
-; String to store unvalidated user input. Assuming that the user will not enter more than 100 characters.
-userInput		BYTE	100 DUP(?)
+
+; String to store unvalidated user input. 
+userInput		BYTE	MAX_BUFFER DUP(?)
 inputLength		DWORD	?
 
-validCount		DWORD	0
+validCount		DWORD	1
 validInputs		SDWORD	10 DUP(?)
 average			SDWORD	?
 
@@ -73,7 +85,22 @@ testValN		SDWORD	-25354760
 main PROC
 	mDisplayString	OFFSET greeting
 
-	;CALL	ReadVal
+	PUSH	OFFSET promptForInput ; 32
+	PUSH	OFFSET userInput 
+	PUSH	OFFSET errorMessage ; 24
+	PUSH	OFFSET validCount
+	PUSH	OFFSET inputLength ; 16
+	PUSH	OFFSET potentialInput
+	PUSH	OFFSET currentDigit ; 8
+	CALL	ReadVal
+	
+	PUSH	testValP
+	PUSH	OFFSET displayOutput
+	CALL	WriteVal
+	CALL	Crlf
+	
+	PUSH	testValN
+	PUSH	OFFSET displayOutput
 	CALL	WriteVal
 	INVOKE  ExitProcess, 0		;exit to operating system
 main ENDP
@@ -81,37 +108,41 @@ main ENDP
 ; ***************************************************************
 ; stuff
 ; effective range: -2,147,483,648 to 2,147,483,647
+
 ; ***************************************************************
-ReadVal	PROC
+ReadVal	PROC	USES EAX EBX ECX ESI
 	LOCAL	negativeInput:DWORD 
 	MOV		negativeInput, 0
-	;TODO going to need: validCount, address of userInput, address of errorMessage, inputLength, potentialInput, currentDigit
-	; Get the first 
+
 	_getInput:
-	; TODO call mGetString
-	;mGetString 
-	; EBX will be used to track the value as it's validated and built.
-	MOV		EBX, 0	
+		MOV		EAX, [EBP + 20]
+		PUSH	[EAX]
+		; TODO fix
+		PUSH	OFFSET displayOutput
+		CALL	WriteVal
+		mGetString [EBP + 32], [EBP + 28], MAX_BUFFER, [EBP + 16]
+	
+		; EBX will be used to track the value as it's validated and built.
+		MOV		EBX, 0	
 
 
-	; TODO replace with actual parameter, stack reference
-	; Use ESI for the source
-	MOV		ESI, OFFSET testString
-	; Replace with the number of bytes written by mGetString
-	; TODO stack
-	MOV		ECX, inputLength
-	; If the user enters nothing (empty input), display an error and re-prompt.
-	CMP		ECX, 0
-	JE		_error
-	; Pre-check: if there are more than 11 characters, there's no way it will fit. (This allows for a sign flag)
-	CMP		ECX, 11
-	JA		_error
-	JMP		_checkSign
+		; TODO replace with actual parameter, stack reference
+		; Use ESI for the source
+		MOV		ESI,  [EBP + 28]
+		; Replace with the number of bytes written by mGetString
+		; TODO stack
+		MOV		ECX, inputLength
+		; If the user enters nothing (empty input), display an error and re-prompt.
+		CMP		ECX, 0
+		JE		_error
+		; Pre-check: if there are more than 11 characters, there's no way it will fit. (This allows for a sign flag)
+		CMP		ECX, 11
+		JA		_error
+		JMP		_checkSign
+
 	_error:
-		; TODO offsets from the stack
 		; Display error message
-		; TODO replace with mDisplayString
-		mDisplayString	OFFSET errorMessage
+		mDisplayString	[EBP + 24]
 		CALL	WriteString
 
 		; Clear out EAX, reset potentialInput, and prompt the user for new input.
@@ -194,10 +225,13 @@ ReadVal	PROC
 		CMP		EBX, MAX_POS_VALUE
 		JA		_error
 
-	;TODO increment validCount, store input, and return if the input was valid. Otherwise start over.
+	;TODO increment validCount, store input correctly, and return if the input was valid. Otherwise start over.
 	_saveResult:
-		MOV		EAX, potentialInput
-		CALL	WriteInt
+		; TODO well this isn't working
+		MOV		EAX, [EBP + 20]
+		INC		EAX
+		;MOV		[EBP + 20], EAX
+		
 	RET
 ReadVal	ENDP
 
@@ -209,42 +243,43 @@ ReadVal	ENDP
 ;		Pop off each character and call mDisplayString
 ; needs: pushedChars, address of result string
 ; ***************************************************************
-WriteVal   PROC
-	LOCAL	negativeOutput:DWORD, outputLength:DWORD
-	MOV		negativeOutput, 0
+WriteVal   PROC USES EAX EBX ECX EDX EDI
+	LOCAL	outputLength:DWORD
 	MOV		outputLength, 0
-	; temp, add in parameters TODO
-	MOV		EAX, testValN
-	MOV		EDI, OFFSET displayOutput
-	; TODO use reference stack thing stuff blah
-	; If the value is negative, the first character is '-'. 
+	; Get the value to be written
+	MOV		EAX, [EBP + 12]
+	; Get the offset of the output string
+	MOV		EDI, [EBP + 8]
+
+	; Is the value negative?
 	TEST	EAX, 80000000h
 	JNE		_outputNegative
 	JMP		_outputDigits
 
 	_outputNegative:
+		; If the value is negative, go ahead and add a leading '-' to the output.
+		; Then get the absolute value of EAX before we start determining the number's digits.
 		NEG		EAX
 		; Need to use AL for a minute, so stash the value in EBX.
 		MOV		EBX, EAX
 		MOV		EAX, 0
 		MOV		AL, ASCII_MINUS		
 		STOSB
+		; Note: Don't increment outputLength here, since nothing is winding up on the stack.
 		MOV		EAX, EBX
 
 	_outputDigits:
 		; Opting to not display a positive sign for non-negative integers.
-		; Bit tricky since both IDIV and STOSB rely in EAX.
 		XOR		EDX, EDX	; clear the remainder register
 		CDQ
 		MOV		ECX, 10
 		IDIV	ECX	
 		; Now EAX contains the quotient and EDX contains the remainder
-		; Stash EAX so we can use STOSB
 		MOV		EBX, EAX
 		MOV		EAX, EDX
 		ADD		EAX, ASCII_BASE
 		; Opting to push all digits onto the stack. Could also build the string directly
-		; and then reverse it.
+		; and then reverse it, but would have to play games with EAX to use STOSB and IDIV.
 		PUSH	EAX
 		INC		outputLength
 		; Recover the quotient, check if it is zero
@@ -261,14 +296,11 @@ WriteVal   PROC
 		POP		EAX
 		STOSB
 		LOOP	_buildString
+
+	; All digits popped off of the stack. Ready to write the string.
 	mDisplayString	OFFSET displayOutput
-
-
-	
-
-
-	
-	RET
+		
+	RET		4
 WriteVal   ENDP
 
 ; ***************************************************************

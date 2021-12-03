@@ -1,4 +1,4 @@
-Microsoft (R) Macro Assembler Version 14.29.30133.0	    12/02/21 17:32:00
+Microsoft (R) Macro Assembler Version 14.29.30133.0	    12/02/21 17:50:22
 User IO (Proj6_marshmeg.asm				     Page 1 - 1
 
 
@@ -232,7 +232,7 @@ Microsoft (R) Macro Assembler Version 14.29.30133.0	    12/02/21 17:32:00
  000003CE 2D 32 31 34 37	testString		BYTE	"-2147483648",0 
 	   34 38 33 36 34
 	   38 00
- 000003DA 0125BCD3		testValP		SDWORD	19250387
+ 000003DA 00000791		testValP		SDWORD	1937
  000003DE FE7D1DF8		testValN		SDWORD	-25354760
  00000000			.code
  00000000			main PROC
@@ -426,18 +426,19 @@ Microsoft (R) Macro Assembler Version 14.29.30133.0	    12/02/21 17:32:00
 						; Stash EAX so we can use STOSB
  00000123  8B D8				MOV		EBX, EAX
  00000125  8B C2				MOV		EAX, EDX
- 00000127  AA					STOSB
- 00000128  FF 45 F8				INC		outputLength
+ 00000127  83 C0 30				ADD		EAX, ASCII_BASE
+ 0000012A  AA					STOSB
+ 0000012B  FF 45 F8				INC		outputLength
 						; Recover the quotient, check if it is zero
- 0000012B  8B C3				MOV		EAX, EBX
- 0000012D  83 F8 00				CMP		EAX, 0
- 00000130  74 02				JE		_readyToDisplay
- 00000132  EB E5				JMP		_outputDigits
-
- 00000134				_readyToDisplay:
+ 0000012E  8B C3				MOV		EAX, EBX
+ 00000130  83 F8 00				CMP		EAX, 0
+ 00000133  74 02				JE		_readyToDisplay
+ 00000135  EB E2				JMP		_outputDigits
+					; Either switch to using the stack or reverse the string
+ 00000137				_readyToDisplay:
 						mDisplayString	OFFSET displayOutput
- 00000134  BA 00000366 R     1		MOV		EDX, OFFSET displayOutput
- 00000139  E8 00000000 E     1		CALL	WriteString
+ 00000137  BA 00000366 R     1		MOV		EDX, OFFSET displayOutput
+ 0000013C  E8 00000000 E     1		CALL	WriteString
 
 
 					
@@ -445,27 +446,27 @@ Microsoft (R) Macro Assembler Version 14.29.30133.0	    12/02/21 17:32:00
 
 					
 					RET
- 0000013E  C9		   *	    leave  
- 0000013F  C3		   *	    ret    00000h
- 00000140			WriteVal   ENDP
+ 00000141  C9		   *	    leave  
+ 00000142  C3		   *	    ret    00000h
+ 00000143			WriteVal   ENDP
 
 				; ***************************************************************
 				; stuff. takes array reference and number of entries to sum (for EC 1)
 				; ***************************************************************
- 00000140			ArraySum	PROC
- 00000140  C3				RET
- 00000141			ArraySum	ENDP
+ 00000143			ArraySum	PROC
+ 00000143  C3				RET
+ 00000144			ArraySum	ENDP
 
 
 				; ***************************************************************
 				; stuff. takes sum and number of entries
 				; ***************************************************************
- 00000141			TruncatedAverage	PROC
- 00000141  C3				RET
- 00000142			TruncatedAverage	ENDP
+ 00000144			TruncatedAverage	PROC
+ 00000144  C3				RET
+ 00000145			TruncatedAverage	ENDP
 
 				END main
-Microsoft (R) Macro Assembler Version 14.29.30133.0	    12/02/21 17:32:00
+Microsoft (R) Macro Assembler Version 14.29.30133.0	    12/02/21 17:50:22
 User IO (Proj6_marshmeg.asm				     Symbols 2 - 1
 
 
@@ -568,14 +569,14 @@ Segments and Groups:
 FLAT . . . . . . . . . . . . . .	GROUP
 STACK  . . . . . . . . . . . . .	32 Bit	 00001000 Para	  Stack	  'STACK'	 
 _DATA  . . . . . . . . . . . . .	32 Bit	 000003E2 Para	  Public  'DATA'	
-_TEXT  . . . . . . . . . . . . .	32 Bit	 00000142 Para	  Public  'CODE'	
+_TEXT  . . . . . . . . . . . . .	32 Bit	 00000145 Para	  Public  'CODE'	
 
 
 Procedures, parameters, and locals:
 
                 N a m e                 Type     Value    Attr
 
-ArraySum . . . . . . . . . . . .	P Near	 00000140 _TEXT	Length= 00000001 Public STDCALL
+ArraySum . . . . . . . . . . . .	P Near	 00000143 _TEXT	Length= 00000001 Public STDCALL
 CloseFile  . . . . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External STDCALL
 CloseHandle  . . . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External STDCALL
 Clrscr . . . . . . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External STDCALL
@@ -672,7 +673,7 @@ Str_length . . . . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External
 Str_trim . . . . . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External STDCALL
 Str_ucase  . . . . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External STDCALL
 SystemTimeToFileTime . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External STDCALL
-TruncatedAverage . . . . . . . .	P Near	 00000141 _TEXT	Length= 00000001 Public STDCALL
+TruncatedAverage . . . . . . . .	P Near	 00000144 _TEXT	Length= 00000001 Public STDCALL
 WaitMsg  . . . . . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External STDCALL
 WriteBinB  . . . . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External STDCALL
 WriteBin . . . . . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External STDCALL
@@ -690,12 +691,12 @@ WriteStackFrameName  . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External
 WriteStackFrame  . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External STDCALL
 WriteString  . . . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External STDCALL
 WriteToFile  . . . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External STDCALL
-WriteVal . . . . . . . . . . . .	P Near	 000000EC _TEXT	Length= 00000054 Public STDCALL
+WriteVal . . . . . . . . . . . .	P Near	 000000EC _TEXT	Length= 00000057 Public STDCALL
   negativeOutput . . . . . . . .	DWord	 bp - 00000004
   outputLength . . . . . . . . .	DWord	 bp - 00000008
   _outputNegative  . . . . . . .	L Near	 00000113 _TEXT	
   _outputDigits  . . . . . . . .	L Near	 00000119 _TEXT	
-  _readyToDisplay  . . . . . . .	L Near	 00000134 _TEXT	
+  _readyToDisplay  . . . . . . .	L Near	 00000137 _TEXT	
 WriteWindowsMsg  . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External STDCALL
 main . . . . . . . . . . . . . .	P Near	 00000000 _TEXT	Length= 00000016 Public STDCALL
 printf . . . . . . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External C

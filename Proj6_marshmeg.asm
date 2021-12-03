@@ -67,7 +67,7 @@ displayOutput	BYTE	100 DUP(?)
 pushedChars		DWORD	0
 
 testString		BYTE	"-2147483648",0 
-testValP		SDWORD	19250387
+testValP		SDWORD	1937
 testValN		SDWORD	-25354760
 .code
 main PROC
@@ -239,6 +239,7 @@ WriteVal   PROC
 		; Stash EAX so we can use STOSB
 		MOV		EBX, EAX
 		MOV		EAX, EDX
+		ADD		EAX, ASCII_BASE
 		STOSB
 		INC		outputLength
 		; Recover the quotient, check if it is zero
@@ -246,7 +247,7 @@ WriteVal   PROC
 		CMP		EAX, 0
 		JE		_readyToDisplay
 		JMP		_outputDigits
-
+	; Either switch to using the stack or reverse the string
 	_readyToDisplay:
 		mDisplayString	OFFSET displayOutput
 

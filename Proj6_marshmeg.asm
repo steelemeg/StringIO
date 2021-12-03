@@ -63,11 +63,11 @@ average			SDWORD	?
 potentialInput	SDWORD	0
 currentDigit	DWORD	0
 ; String to store output. 
-displayOutput	BYTE	100 DUP(?)
+displayOutput	BYTE	15 DUP(?)
 pushedChars		DWORD	0
 
 testString		BYTE	"-2147483648",0 
-testValP		SDWORD	1937
+testValP		SDWORD	25354760
 testValN		SDWORD	-25354760
 .code
 main PROC
@@ -214,7 +214,7 @@ WriteVal   PROC
 	MOV		negativeOutput, 0
 	MOV		outputLength, 0
 	; temp, add in parameters TODO
-	MOV		EAX, testValP
+	MOV		EAX, testValN
 	MOV		EDI, OFFSET displayOutput
 	; TODO use reference stack thing stuff blah
 	; If the value is negative, the first character is '-'. 
@@ -223,14 +223,17 @@ WriteVal   PROC
 	JMP		_outputDigits
 
 	_outputNegative:
-		MOV		AL, ASCII_MINUS
-		STOSB	
-		INC		outputLength
+		NEG		EAX
+		; Need to use AL for a minute, so stash the value in EBX.
+		MOV		EBX, EAX
+		MOV		EAX, 0
+		MOV		AL, ASCII_MINUS		
+		STOSB
+		MOV		EAX, EBX
 
 	_outputDigits:
 		; Opting to not display a positive sign for non-negative integers.
 		; Bit tricky since both IDIV and STOSB rely in EAX.
-		; STOSB takes the AL register into the EDI addressed location
 		XOR		EDX, EDX	; clear the remainder register
 		CDQ
 		MOV		ECX, 10
@@ -240,16 +243,25 @@ WriteVal   PROC
 		MOV		EBX, EAX
 		MOV		EAX, EDX
 		ADD		EAX, ASCII_BASE
-		STOSB
+		; Opting to push all digits onto the stack. Could also build the string directly
+		; and then reverse it.
+		PUSH	EAX
 		INC		outputLength
 		; Recover the quotient, check if it is zero
 		MOV		EAX, EBX
 		CMP		EAX, 0
-		JE		_readyToDisplay
-		JMP		_outputDigits
-	; Either switch to using the stack or reverse the string
-	_readyToDisplay:
-		mDisplayString	OFFSET displayOutput
+		JNE		_outputDigits
+		; Otherwise, move our total character count into ECX in preparation for building a string.
+		MOV		ECX, outputLength
+
+	_buildString:
+		; At this point all the digits are on the stack as DWORDS
+		; ECX contains the number of digits to be popped and added to the output string array
+		; STOSB takes the AL register into the EDI addressed location
+		POP		EAX
+		STOSB
+		LOOP	_buildString
+	mDisplayString	OFFSET displayOutput
 
 
 	

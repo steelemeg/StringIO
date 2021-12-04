@@ -1,13 +1,13 @@
-TITLE User IO (Proj6_marshmeg.asm)
+TITLE String IO (Proj6_marshmeg.asm)
 
 ; Author: Megan Marshall
-; Last Modified: December 1, 2021
+; Last Modified: December 4, 2021
 ; OSU email address:marshmeg@oregonstate.edu
 ; Course number/section:   CS271 Section 400
 ; Project Number: 6               Due Date: December 5, 2021
-; Description: This program uses macros to support string processing and user input/output. It gathers 10 inputs from the user,
-;				validates that they are integers in the correct range, sotres them in an array, and displays the results,
-;				their sum, and their rounded average to the user. 
+; Description: This program uses macros to support string processing and user input/output. It gathers 10 string inputs 
+;				from the user, validates that they are integers in the correct range, sotres them in an array, and
+;				displays the results, their sum, and their truncated average to the user. 
 
 INCLUDE Irvine32.inc
 
@@ -86,24 +86,32 @@ testValN		SDWORD	-25354760
 main PROC
 	mDisplayString	OFFSET greeting
 
+	; We need to retrieve valid user input ten times
 	MOV		ECX, 10
+	; This is where validated numbers will be stored
+	MOV		EDI, OFFSET validInputs
 	_getTenNumbers:
-		PUSH	ECX
+
+		MOV		EDI, OFFSET validInputs
+		; Provide values for current line number (EC 1)
+		PUSH	ECX	; 40
 		PUSH	OFFSET displayOutput
-		CALL	CurrentCount
 		
+		PUSH	OFFSET promptForInput ; 32
+		PUSH	OFFSET userInput 
+		PUSH	OFFSET errorMessage ; 24
+		PUSH	EDI ; put edi here lol
+		PUSH	OFFSET inputLength ; 16
+		PUSH	OFFSET potentialInput
+		PUSH	OFFSET currentDigit ; 8
+
+		; Ask the user for valid input
+		CALL	ReadVal
+		
+		; loop goes here, EDI gets incremented
 		LOOP	_getTenNumbers
 
-	MOV		EDI, OFFSET validInputs
-	; loop goes here, EDI gets incremented
-	PUSH	OFFSET promptForInput ; 32
-	PUSH	OFFSET userInput 
-	PUSH	OFFSET errorMessage ; 24
-	PUSH	EDI ; put edi here lol
-	PUSH	OFFSET inputLength ; 16
-	PUSH	OFFSET potentialInput
-	PUSH	OFFSET currentDigit ; 8
-	CALL	ReadVal
+
 		
 	;PUSH	testValN
 	;PUSH	OFFSET displayOutput
@@ -121,6 +129,9 @@ ReadVal	PROC	USES EAX EBX ECX ESI
 	MOV		negativeInput, 0
 
 	_getInput:
+		PUSH	[EBP + 40]
+		PUSH	[EBP + 36]
+		CALL	CurrentCount
 		mGetString [EBP + 32], [EBP + 28], MAX_BUFFER, [EBP + 16]
 	
 		; TODO good to this point - mGetString does what's intended
@@ -326,6 +337,7 @@ ArraySum	ENDP
 
 ; ***************************************************************
 ; stuff. prints the line number (for EC 1)
+; DONE TODO Comments
 ; ***************************************************************
 CurrentCount	PROC	USES EAX EDX
 	PUSH	EBP						; Preserve EBP
@@ -334,9 +346,10 @@ CurrentCount	PROC	USES EAX EDX
 	MOV		EAX, [EBP + 12 + 8]
 	; Get the output location from the stack
 	MOV		EDX, [EBP + 8 + 8]
-
+	; Calculate the current line number
 	SUB		EAX, COUNTER_BASE
 	NEG		EAX
+	; Pass the value and the output offset off to WriteVal
 	PUSH	EAX
 	PUSH	EDX
 	CALL	WriteVal

@@ -26,8 +26,7 @@ mGetString MACRO promptMessage, inputString, maxLength, bytesRead
 	MOV		ECX, maxLength
 	MOV		EDX, inputString
 	CALL	ReadString
-	; Track how many characters the user entered. Note this is +1 for null terminated.
-	;MOV		bytesRead, EAX	
+	; Track how many characters the user entered.
 	MOV		EDX, bytesRead
 	MOV		[EDX], EAX
 
@@ -38,8 +37,10 @@ ENDM
 
 mDisplayString MACRO printTarget
 ;Print the string which is stored in a specified memory location (input parameter, by reference).
+	PUSH	EDX
 	MOV		EDX, printTarget
 	CALL	WriteString
+	POP		EDX
 ENDM
 
 ; Constants. Defining bounds of valid ASCII inputs so I don't have ambiguous hex values in my code.
@@ -93,15 +94,10 @@ main PROC
 	PUSH	OFFSET potentialInput
 	PUSH	OFFSET currentDigit ; 8
 	CALL	ReadVal
-	
-	PUSH	testValP
-	PUSH	OFFSET displayOutput
-	CALL	WriteVal
-	CALL	Crlf
-	
-	PUSH	testValN
-	PUSH	OFFSET displayOutput
-	CALL	WriteVal
+		
+	;PUSH	testValN
+	;PUSH	OFFSET displayOutput
+	;CALL	WriteVal
 	INVOKE  ExitProcess, 0		;exit to operating system
 main ENDP
 
@@ -117,25 +113,39 @@ ReadVal	PROC	USES EAX EBX ECX ESI
 	_getInput:
 		MOV		EAX, [EBP + 20]
 		PUSH	[EAX]
-		; TODO fix
+		; TODO fix. Verified that mGetString is writing correctly.
 		PUSH	OFFSET displayOutput
 		CALL	WriteVal
 		mGetString [EBP + 32], [EBP + 28], MAX_BUFFER, [EBP + 16]
 	
+		; TODO good to this point - mGetString does what's intended
+		
+		; Use ESI for the source
+		MOV		ESI, [EBP + 28]
+		; TODO testing. So here's the syntax problem. This has an address where I want a value.
+		; On the bright side, it's the address of inputLength, 0x0040632c
+		; So how to get the value?
+		MOV		EBX, [EBP + 16]
+		;MOV		[EAX], EBX
+		MOV		EAX, [EBX]
+		; Still the address
+		CALL	Crlf
+		Call	WriteDec
+		CALL	Crlf
+
+
+		; Counter is the number of bytes written by mGetString
+		MOV		EBX, [EBP + 16]
+		; TODO WHY IS ECX HUGE IT SHOULD BE 2 it's a flipping address stored there
+		MOV		ECX, [EBX]
+
 		; EBX will be used to track the value as it's validated and built.
 		MOV		EBX, 0	
-
-
-		; TODO replace with actual parameter, stack reference
-		; Use ESI for the source
-		MOV		ESI,  [EBP + 28]
-		; Replace with the number of bytes written by mGetString
-		; TODO stack
-		MOV		ECX, inputLength
 		; If the user enters nothing (empty input), display an error and re-prompt.
 		CMP		ECX, 0
 		JE		_error
 		; Pre-check: if there are more than 11 characters, there's no way it will fit. (This allows for a sign flag)
+		; TODO is this legit? try without these two lines.
 		CMP		ECX, 11
 		JA		_error
 		JMP		_checkSign
@@ -218,7 +228,10 @@ ReadVal	PROC	USES EAX EBX ECX ESI
 		CLC
 		ADD		potentialInput, EBX
 
-		JO		_error		
+		JO		_error	
+		; This is a bit of a mess. When moving an over-large positive number into potentialInput, no flags were being set,
+		; and the value simply overflowed to negative numbers. Workaround: Check if the value was supposed to be negative, 
+		; then if not, check if unsigned EBX exceeded 2^31 -1
 		MOV		EAX, negativeInput
 		CMP		EAX, 1
 		JE		_saveResult

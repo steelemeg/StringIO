@@ -129,6 +129,7 @@ ReadVal	PROC	USES EAX EBX ECX ESI
 	MOV		negativeInput, 0
 
 	_getInput:
+		; Get user input written as a string into userInput. Size will be in inputLength.
 		PUSH	[EBP + 40]
 		PUSH	[EBP + 36]
 		CALL	CurrentCount
@@ -138,13 +139,9 @@ ReadVal	PROC	USES EAX EBX ECX ESI
 		
 		; Use ESI for the source
 		MOV		ESI, [EBP + 28]
-		; TODO testing. So here's the syntax problem. This has an address where I want a value.
-		; On the bright side, it's the address of inputLength, 0x0040632c
-		; So how to get the value?
-		;MOV		EBX, [EBP + 16]
-		; THIS WORKED?!
+
+		; syntax reminder
 		;MOV		EAX, [EBX]
-		; Still the address
 
 		; Counter is the number of bytes written by mGetString
 		MOV		EBX, [EBP + 16]
@@ -164,13 +161,10 @@ ReadVal	PROC	USES EAX EBX ECX ESI
 	_error:
 		; Display error message
 		mDisplayString	[EBP + 24]
-		CALL	WriteString
 
-		; Clear out EAX, reset potentialInput, and prompt the user for new input.
+		; Clear out EAX, reset EBX, and prompt the user for new input.
 		XOR		EAX, EAX
 		MOV		EBX, 0
-		; TODO temporary
-		RET
 		JMP		_getInput
 
 	; Check if the first character is '-' or '+'

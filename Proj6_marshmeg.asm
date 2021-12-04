@@ -57,10 +57,8 @@ COUNTER_BASE	EQU		11
 greeting		BYTE	"   Welcome to the String IO Project by Megan Marshall.",13,10
 				BYTE	"-------------------------------------------------------------",13,10
 				BYTE	"**EC 1: Number each line of user input and display a running subtotal of valid inputs.",13,10,13,10
-				BYTE	"This program will ask you for 10 signed decimal integers. ",13,10
-				BYTE	"Each integer needs to fit in a 32 bit signed integer. Therefore, it should be no smaller ",13,10
-				BYTE	"than -2,147,483,648 and no larger than 2,147,483,647.",13,10
-				BYTE	"Invalid entries will not be accepted!",13,10,13,10
+				BYTE	"This program will ask you for 10 signed decimal integers. Each integer needs to fit in",13,10
+				BYTE	"a 32 bit signed integer. Invalid or non-numeric entries will not be accepted!",13,10,13,10
 				BYTE	"After 10 valid entries have been provided, you will be shown all your valid inputs, their ",13,10
 				BYTE	"sum, and their average value.",13,10,13,10,0
 promptForInput	BYTE	". Please enter a signed integer: ",0
@@ -73,8 +71,6 @@ inputLength		DWORD	?
 validInputs		SDWORD	10 DUP(?)
 average			SDWORD	?
 
-potentialInput	SDWORD	0
-currentDigit	DWORD	0
 ; String to store output. 
 displayOutput	BYTE	15 DUP(?)
 pushedChars		DWORD	0
@@ -93,17 +89,14 @@ main PROC
 	_getTenNumbers:
 
 		MOV		EDI, OFFSET validInputs
-		; Provide values for current line number (EC 1)
-		PUSH	ECX	; 40
-		PUSH	OFFSET displayOutput
 		
 		PUSH	OFFSET promptForInput ; 32
 		PUSH	OFFSET userInput 
 		PUSH	OFFSET errorMessage ; 24
-		PUSH	EDI ; put edi here lol
+		PUSH	[EDI] 
 		PUSH	OFFSET inputLength ; 16
-		PUSH	OFFSET potentialInput
-		PUSH	OFFSET currentDigit ; 8
+		PUSH	ECX
+		PUSH	OFFSET displayOutput ; 8
 
 		; Ask the user for valid input
 		CALL	ReadVal
@@ -125,17 +118,15 @@ main ENDP
 
 ; ***************************************************************
 ReadVal	PROC	USES EAX EBX ECX ESI
-	LOCAL	negativeInput:DWORD 
+	LOCAL	negativeInput:DWORD, currentDigit:DWORD, potentialInput:SDWORD 
 	MOV		negativeInput, 0
 
 	_getInput:
 		; Get user input written as a string into userInput. Size will be in inputLength.
-		PUSH	[EBP + 40]
-		PUSH	[EBP + 36]
+		PUSH	[EBP + 12]
+		PUSH	[EBP + 8]
 		CALL	CurrentCount
 		mGetString [EBP + 32], [EBP + 28], MAX_BUFFER, [EBP + 16]
-	
-		; TODO good to this point - mGetString does what's intended
 		
 		; Use ESI for the source
 		MOV		ESI, [EBP + 28]
@@ -154,8 +145,8 @@ ReadVal	PROC	USES EAX EBX ECX ESI
 		JE		_error
 		; Pre-check: if there are more than 11 characters, there's no way it will fit. (This allows for a sign flag)
 		; TODO is this legit? try without these two lines.
-		CMP		ECX, 11
-		JA		_error
+		;CMP		ECX, 11
+		;JA		_error
 		JMP		_checkSign
 
 	_error:
@@ -213,11 +204,13 @@ ReadVal	PROC	USES EAX EBX ECX ESI
 		_subtractNextDigit:
 			SUB		EAX, currentDigit
 			JO		_error
+			;JC		_error
 			JMP		_nextDigit
 
 		_addNextDigit:
 			ADD		EAX, currentDigit
 			JO		_error
+			JC		_error
 			JMP		_nextDigit
 
 		; Move the final value back into EBX and we're ready for the next digit.
@@ -231,6 +224,7 @@ ReadVal	PROC	USES EAX EBX ECX ESI
 	_checkFinalSize:
 		; Does the final result fit in a SDWORD? Clear the carry flag first to avoid weird bugs
 		CLC
+		MOV		potentialInput, 0
 		ADD		potentialInput, EBX
 
 		JO		_error	
@@ -248,7 +242,12 @@ ReadVal	PROC	USES EAX EBX ECX ESI
 		; TODO next mess on the horizon: how to move through the validInputs array in main and pass the address in 
 		; Increase validCount by 1. Future work--find a neater way to do this
 		; Look up stack input output parameter references
-
+		; TODO testing
+		; [EBP + 20] is where the array starts
+		MOV		[EBP + 20], EBX
+		MOV		EAX, potentialInput
+		CALL	WriteDec
+		CALL CRLF
 		
 	RET
 ReadVal	ENDP

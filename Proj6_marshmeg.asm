@@ -51,6 +51,7 @@ ASCII_NINE		EQU		39h
 ASCII_BASE		EQU		30h
 MAX_POS_VALUE	EQU		2147483647
 MAX_BUFFER		EQU		100
+COUNTER_BASE	EQU		11
 
 .data
 greeting		BYTE	"   Welcome to the String IO Project by Megan Marshall.",13,10
@@ -69,7 +70,6 @@ errorMessage	BYTE	"ERROR: Your entry was not valid or did not fit in a 32 byte s
 userInput		BYTE	MAX_BUFFER DUP(?)
 inputLength		DWORD	?
 
-validCount		DWORD	1
 validInputs		SDWORD	10 DUP(?)
 average			SDWORD	?
 
@@ -86,10 +86,20 @@ testValN		SDWORD	-25354760
 main PROC
 	mDisplayString	OFFSET greeting
 
+	MOV		ECX, 10
+	_getTenNumbers:
+		PUSH	ECX
+		PUSH	OFFSET displayOutput
+		CALL	CurrentCount
+		
+		LOOP	_getTenNumbers
+
+	MOV		EDI, OFFSET validInputs
+	; loop goes here, EDI gets incremented
 	PUSH	OFFSET promptForInput ; 32
 	PUSH	OFFSET userInput 
 	PUSH	OFFSET errorMessage ; 24
-	PUSH	OFFSET validCount
+	PUSH	EDI ; put edi here lol
 	PUSH	OFFSET inputLength ; 16
 	PUSH	OFFSET potentialInput
 	PUSH	OFFSET currentDigit ; 8
@@ -111,11 +121,6 @@ ReadVal	PROC	USES EAX EBX ECX ESI
 	MOV		negativeInput, 0
 
 	_getInput:
-		MOV		EAX, [EBP + 20]
-		PUSH	[EAX]
-		; TODO fix. Verified that mGetString is writing correctly.
-		PUSH	OFFSET displayOutput
-		CALL	WriteVal
 		mGetString [EBP + 32], [EBP + 28], MAX_BUFFER, [EBP + 16]
 	
 		; TODO good to this point - mGetString does what's intended
@@ -125,18 +130,13 @@ ReadVal	PROC	USES EAX EBX ECX ESI
 		; TODO testing. So here's the syntax problem. This has an address where I want a value.
 		; On the bright side, it's the address of inputLength, 0x0040632c
 		; So how to get the value?
-		MOV		EBX, [EBP + 16]
-		;MOV		[EAX], EBX
-		MOV		EAX, [EBX]
+		;MOV		EBX, [EBP + 16]
+		; THIS WORKED?!
+		;MOV		EAX, [EBX]
 		; Still the address
-		CALL	Crlf
-		Call	WriteDec
-		CALL	Crlf
-
 
 		; Counter is the number of bytes written by mGetString
 		MOV		EBX, [EBP + 16]
-		; TODO WHY IS ECX HUGE IT SHOULD BE 2 it's a flipping address stored there
 		MOV		ECX, [EBX]
 
 		; EBX will be used to track the value as it's validated and built.
@@ -182,7 +182,7 @@ ReadVal	PROC	USES EAX EBX ECX ESI
 	_unsigned:
 		MOV		negativeInput, 0
 		; If the first character wasn't '-' or '+', reset ESI to the first character in the string.
-		MOV		ESI, OFFSET testString
+		MOV		ESI, [EBP + 28]
 
 	_processString:
 		XOR		EAX, EAX
@@ -238,12 +238,12 @@ ReadVal	PROC	USES EAX EBX ECX ESI
 		CMP		EBX, MAX_POS_VALUE
 		JA		_error
 
-	;TODO increment validCount, store input correctly, and return if the input was valid. Otherwise start over.
+	;TODO increment validCount, store input correctly in the array, and return if the input was valid. Otherwise start over.
 	_saveResult:
-		; TODO well this isn't working
-		MOV		EAX, [EBP + 20]
-		INC		EAX
-		;MOV		[EBP + 20], EAX
+		; TODO next mess on the horizon: how to move through the validInputs array in main and pass the address in 
+		; Increase validCount by 1. Future work--find a neater way to do this
+		; Look up stack input output parameter references
+
 		
 	RET
 ReadVal	ENDP
@@ -259,6 +259,7 @@ ReadVal	ENDP
 WriteVal   PROC USES EAX EBX ECX EDX EDI
 	LOCAL	outputLength:DWORD
 	MOV		outputLength, 0
+	
 	; Get the value to be written
 	MOV		EAX, [EBP + 12]
 	; Get the offset of the output string
@@ -313,7 +314,7 @@ WriteVal   PROC USES EAX EBX ECX EDX EDI
 	; All digits popped off of the stack. Ready to write the string.
 	mDisplayString	OFFSET displayOutput
 		
-	RET		4
+	RET		8
 WriteVal   ENDP
 
 ; ***************************************************************
@@ -323,7 +324,26 @@ ArraySum	PROC
 	RET
 ArraySum	ENDP
 
+; ***************************************************************
+; stuff. prints the line number (for EC 1)
+; ***************************************************************
+CurrentCount	PROC	USES EAX EDX
+	PUSH	EBP						; Preserve EBP
+	MOV		EBP, ESP
+	; Get the counter value from the stack
+	MOV		EAX, [EBP + 12 + 8]
+	; Get the output location from the stack
+	MOV		EDX, [EBP + 8 + 8]
 
+	SUB		EAX, COUNTER_BASE
+	NEG		EAX
+	PUSH	EAX
+	PUSH	EDX
+	CALL	WriteVal
+
+	POP		EBP					; Restore EBP
+	RET		8					; De-reference the 2 4-byte offsets on the stack and return
+CurrentCount	ENDP
 ; ***************************************************************
 ; stuff. takes sum and number of entries
 ; ***************************************************************

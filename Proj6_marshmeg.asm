@@ -73,7 +73,6 @@ userInput		BYTE	MAX_BUFFER DUP(?)
 inputLength		DWORD	?
 
 validInputs		SDWORD	10 DUP(?)
-average			SDWORD	?
 sum				SDWORD	?
 
 testString		BYTE	"-2147483648",0 
@@ -122,10 +121,11 @@ main PROC
 	PUSH	OFFSET validInputs	;8
 	CALL	ArraySum
 
-	; TODO test
-	CALL	CRLF
-	MOV		EAX, sum
-	CALL	WriteDec
+	; Show the truncated average
+	PUSH	sum ;16
+	PUSH	LENGTHOF validInputs
+	PUSH	OFFSET avgMessage ;8
+	CALL	TruncatedAverage
 
 	INVOKE  ExitProcess, 0		;exit to operating system
 main ENDP
@@ -400,13 +400,13 @@ ArraySum	PROC USES EAX ECX ESI
 	PUSH	EAX
 	CALL	WriteVal
 	; Store the result -- we'll need it for finding the average
-	; [EBP + 20 + 12]
 	MOV		EDX, [EBP + 20 + 12]
 	MOV		[EDX], EAX
 
 	POP		EBP						; Restore EBP
 	RET		20						; De-reference the stack and return
 ArraySum	ENDP
+
 ; ***************************************************************
 ; stuff. prints the line number (for EC 1)
 ; DONE TODO Comments
@@ -427,11 +427,27 @@ CurrentCount	PROC	USES EAX EDX
 	POP		EBP					; Restore EBP
 	RET		4					; De-reference the 2 4-byte offsets on the stack and return
 CurrentCount	ENDP
+
 ; ***************************************************************
 ; stuff. takes sum and number of entries
 ; ***************************************************************
-TruncatedAverage	PROC
-	RET
+TruncatedAverage	PROC	USES EAX EBX EDX
+	PUSH	EBP						; Preserve EBP
+	MOV		EBP, ESP
+	; Get the sum value
+	MOV		EAX, [EBP + 16 + 12]
+	CDQ
+	; Get the number of inputs
+	MOV		EBX, [EBP + 12 + 12]
+	; Find the truncated average -- just ignore the remainder
+	IDIV	EBX
+	; Display the message
+	mDisplayString [EBP + 8 + 12]
+	PUSH	EAX
+	CALL	WriteVal
+
+	POP		EBP					; Restore EBP
+	RET		12					; De-reference and return
 TruncatedAverage	ENDP
 
 END main

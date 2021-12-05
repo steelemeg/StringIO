@@ -72,14 +72,15 @@ mDisplayString MACRO printTarget
 ENDM
 
 ; Constants. Defining bounds of valid ASCII inputs so I don't have ambiguous hex values in my code.
-ASCII_MINUS		EQU		2Dh
-ASCII_PLUS		EQU		2Bh
-ASCII_ZERO		EQU		30h
-ASCII_NINE		EQU		39h
-ASCII_BASE		EQU		30h
-MAX_POS_VALUE	EQU		2147483647
-MAX_BUFFER		EQU		100
-COUNTER_BASE	EQU		11
+ASCII_MINUS		=		2Dh
+ASCII_PLUS		=		2Bh
+ASCII_ZERO		=		30h
+ASCII_NINE		=		39h
+ASCII_BASE		=		30h
+MAX_POS_VALUE	=		2147483647
+MAX_ABS_VALUE	=		2147483648
+MAX_BUFFER		=		100
+COUNTER_BASE	=		11
 
 .data
 greetingMessage		BYTE	"   Welcome to the String IO Project by Megan Marshall.",13,10
@@ -178,7 +179,7 @@ main ENDP
 ; Name: ReadVal
 ;
 ; Gets user input. Validates it represents a signed 32 bit integer. 
-;	If not, displays an error message and has the user try again.) 
+;	If not, displays an error message and has the user try again.
 ;	Saves valid input to a specified memory location.
 ; For each entry, displays a line number. After the first input is accepted, displays
 ;	the running subtotal after each valid entry.
@@ -197,7 +198,8 @@ main ENDP
 ; Returns:  Writes unvalidated user input into userInput.
 ;			Writes the number of bytes corresponding to the size of user input into bytesRead.
 ;			Writes validated inputs into the specified address in validInputs.
-; TODO shoudl userInput ebp+28 be a local string? maybe bytesRead ebp + 16too?
+; 
+; Future improvement: Make userInput (ebp + 28) and bytesRead (ebp + 16) local.
 ; ---------------------------------------------------------------------------------
 ReadVal	PROC	USES EAX EBX ECX EDX ESI
 	LOCAL	negativeInput:DWORD, currentDigit:DWORD, potentialInput:SDWORD
@@ -221,10 +223,6 @@ ReadVal	PROC	USES EAX EBX ECX EDX ESI
 		; If the user enters nothing (empty input), display an error and re-prompt.
 		CMP		ECX, 0
 		JE		_error
-		; Pre-check: if there are more than 11 characters, there's no way it will fit. (This allows for a sign flag)
-		; TODO is this legit? try without these two lines.
-		;CMP		ECX, 11
-		;JA		_error
 		JMP		_checkSign
 
 	_error:
@@ -236,7 +234,7 @@ ReadVal	PROC	USES EAX EBX ECX EDX ESI
 		MOV		EBX, 0
 		JMP		_getInput
 
-	; Check if the first character is '-' or '+'
+	; Check if the first character is '-' or '+'.
 	_checkSign:
 		LODSB
 		CMP		AL, ASCII_MINUS
@@ -246,10 +244,12 @@ ReadVal	PROC	USES EAX EBX ECX EDX ESI
 		JMP		_unsigned
 
 	_negative:
+		; If it's '-', set the flag and move to the next index.
 		MOV		negativeInput, 1
 		DEC		ECX
 		JMP		_processString
 	_positive:
+		; If it's '+', set the flag and move to the next index.
 		MOV		negativeInput, 0
 		DEC		ECX
 		JMP		_processString
@@ -258,8 +258,8 @@ ReadVal	PROC	USES EAX EBX ECX EDX ESI
 		; If the first character wasn't '-' or '+', reset ESI to the first character in the string.
 		MOV		ESI, [EBP + 28]
 
-	;TODO turns out my logic is still wrong
 	_processString:
+		; Get the next character.
 		XOR		EAX, EAX
 		LODSB
 		; Validate! Is the character a sigit between 0 and 9?
@@ -272,10 +272,12 @@ ReadVal	PROC	USES EAX EBX ECX EDX ESI
 		SUB		AL, ASCII_BASE
 		; Stash this value in currentDigit for the time being
 		MOV		currentDigit, EAX
-		; Then multiply the existing value of EBX by 10 and add or subtrac the newest digit, depending on the sign.
+		; Then multiply the existing value of EBX by 10 and add or subtract the newest digit, depending on the sign.
 		MOV		EAX, EBX
 		MOV		EBX, 10
-		MUL		EBX
+		IMUL	EBX
+		JO		_error
+		JC		_error
 		CMP		negativeInput, 1
 		JE		_subtractNextDigit
 		JMP		_addNextDigit
@@ -330,6 +332,130 @@ ReadVal	PROC	USES EAX EBX ECX EDX ESI
 	RET 24
 ReadVal	ENDP
 
+ReadValA	PROC	USES EAX EBX ECX EDX ESI
+	LOCAL	negativeInput:DWORD, currentDigit:DWORD, potentialInput:SDWORD
+	MOV		negativeInput, 0
+
+	_getInput:
+		; Get user input written as a string into userInput. Size will be in inputLength.
+		PUSH	[EBP + 12]
+		CALL	CurrentCount
+		mGetString [EBP + 8], [EBP + 28], MAX_BUFFER, [EBP + 16]
+		
+		; Use ESI for the source
+		MOV		ESI, [EBP + 28]
+
+		; Counter is the number of bytes written by mGetString
+		MOV		EBX, [EBP + 16]
+		MOV		ECX, [EBX]
+
+		; EBX will be used to track the value as it's validated and built.
+		MOV		EBX, 0	
+		; If the user enters nothing (empty input), display an error and re-prompt.
+		CMP		ECX, 0
+		JE		_error
+		JMP		_checkSign
+
+	_error:
+		; Display error message
+		mDisplayString	[EBP + 24]
+
+		; Clear out EAX, reset EBX, and prompt the user for new input.
+		XOR		EAX, EAX
+		MOV		EBX, 0
+		JMP		_getInput
+
+	; Check if the first character is '-' or '+'
+	_checkSign:
+		LODSB
+		CMP		AL, ASCII_MINUS
+		JE		_negative
+		CMP		AL, ASCII_PLUS
+		JE		_positive
+		JMP		_unsigned
+
+	_negative:
+		MOV		negativeInput, 1
+		DEC		ECX
+		JMP		_processString
+	_positive:
+		MOV		negativeInput, 0
+		DEC		ECX
+		JMP		_processString
+	_unsigned:
+		MOV		negativeInput, 0
+		; If the first character wasn't '-' or '+', reset ESI to the first character in the string.
+		MOV		ESI, [EBP + 28]
+
+	; Pre-check: if there are more than 10 characters, there's no way it will fit. (Sign flag already processed)
+		;CMP		ECX, 10
+		;JA		_error
+		
+	_processString:
+		XOR		EAX, EAX
+		LODSB
+		; Validate! Is the character a sigit between 0 and 9?
+		CMP		AL, ASCII_ZERO
+		JB		_error
+		CMP		AL, ASCII_NINE
+		JA		_error
+
+		; If the character was valid, convert the ASCII value to hex value by subtracting 30h.
+		SUB		AL, ASCII_BASE
+		; Stash this value in currentDigit for the time being
+		MOV		currentDigit, EAX
+		; Then multiply the existing value of EBX by 10 and add or subtract the newest digit, depending on the sign.
+		MOV		EAX, EBX
+		MOV		EBX, 10
+		MUL		EBX
+		JO		_error
+		JC		_error
+		
+		ADD		EAX, currentDigit
+		;JO		_error
+		JC		_error
+		; Extra check for wraparound overflows -- did the value go negative? At this point we're unsigned and 
+		; working with the absolute value.
+		CMP		EAX, 0	
+		JB		_error
+		CMP		EAX, MAX_ABS_VALUE
+		JA		_error
+
+		; Move the final value back into EBX and we're ready for the next digit.
+		MOV		EBX, EAX			
+		LOOP	_processString
+
+	; At this point the string has been validated and an integer equivalent built in EBX.
+	_checkFinalSize:
+		; Does the final result fit in a SDWORD? Clear the carry flag first to avoid weird bugs
+		CLC
+		MOV		potentialInput, 0
+		ADD		potentialInput, EBX
+
+		JO		_error	
+		; Check if the value was supposed to be negative, then if not, check if unsigned EBX exceeded 2^31 -1
+		MOV		EAX, negativeInput
+		CMP		EAX, 1
+		JE		_negativeFinalValue
+		JMP		_positiveFinalValue
+
+		_negativeFinalValue:
+			NEG		EBX
+			CMP		EBX, 0
+			JNS		_error
+			JMP		_saveResult
+
+		_positiveFinalValue:
+			CMP		EBX, MAX_POS_VALUE
+			JA		_error
+
+	; Store input correctly in the array, and return.
+	_saveResult:
+		; [EBP + 20] is the address of the current index in the validInputs array
+		MOV		EDX, [EBP + 20]
+		MOV		[EDX], EBX		
+	RET 24
+ReadValA	ENDP
 ; ---------------------------------------------------------------------------------
 ; Name: WriteVal
 ;
@@ -372,9 +498,10 @@ WriteVal   PROC USES EAX EBX ECX EDX EDI
 	_outputDigits:
 		; Opting to not display a positive sign for non-negative integers.
 		XOR		EDX, EDX	; clear the remainder register
-		CDQ
+		; Note: Originally used IDIV/CDQ but this caused problems for edge cases. Since the sign
+		; has already been parsed, this can be treated as unsigned math, so DIV works better.
 		MOV		ECX, 10
-		IDIV	ECX	
+		DIV		ECX	
 		; Now EAX contains the quotient and EDX contains the remainder
 		MOV		EBX, EAX
 		MOV		EAX, EDX

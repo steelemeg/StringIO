@@ -122,6 +122,11 @@ main PROC
 	PUSH	OFFSET validInputs	;8
 	CALL	ArraySum
 
+	; TODO test
+	CALL	CRLF
+	MOV		EAX, sum
+	CALL	WriteDec
+
 	INVOKE  ExitProcess, 0		;exit to operating system
 main ENDP
 
@@ -392,9 +397,12 @@ ArraySum	PROC USES EAX ECX ESI
 		ADD		EAX, [ESI]
 		ADD		ESI, [EBP + 24 + 12]
 		LOOP	_sumLoop
-	CALL	WriteDec
+	PUSH	EAX
+	CALL	WriteVal
 	; Store the result -- we'll need it for finding the average
 	; [EBP + 20 + 12]
+	MOV		EDX, [EBP + 20 + 12]
+	MOV		[EDX], EAX
 
 	POP		EBP						; Restore EBP
 	RET		20						; De-reference the stack and return

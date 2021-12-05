@@ -74,10 +74,6 @@ inputLength		DWORD	?
 validInputs		SDWORD	10 DUP(?)
 average			SDWORD	?
 
-; String to store output. 
-displayOutput	BYTE	15 DUP(?)
-pushedChars		DWORD	0
-
 testString		BYTE	"-2147483648",0 
 testValP		SDWORD	2
 testValN		SDWORD	-2
@@ -93,13 +89,13 @@ main PROC
 	MOV		EDI, OFFSET validInputs
 
 	_getTenNumbers:
-		PUSH	OFFSET promptForInput ; 32
+		
 		PUSH	OFFSET userInput 
 		PUSH	OFFSET errorMessage ; 24
 		PUSH	EDI 
 		PUSH	OFFSET inputLength ; 16
 		PUSH	ECX
-		PUSH	OFFSET displayOutput ; 8
+		PUSH	OFFSET promptForInput ; 8
 
 		; Ask the user for valid input
 		CALL	ReadVal
@@ -109,8 +105,6 @@ main PROC
 		LOOP	_getTenNumbers
 
 	; Show the array
-	; TODO GET RID OF THIS
-	PUSH	OFFSET displayOutput
 	PUSH	TYPE validInputs
 	PUSH	OFFSET resultsMessage
 	PUSH	LENGTHOF validInputs
@@ -139,9 +133,8 @@ ReadVal	PROC	USES EAX EBX ECX ESI
 	_getInput:
 		; Get user input written as a string into userInput. Size will be in inputLength.
 		PUSH	[EBP + 12]
-		PUSH	[EBP + 8]
 		CALL	CurrentCount
-		mGetString [EBP + 32], [EBP + 28], MAX_BUFFER, [EBP + 16]
+		mGetString [EBP + 8], [EBP + 28], MAX_BUFFER, [EBP + 16]
 		
 		; Use ESI for the source
 		MOV		ESI, [EBP + 28]
@@ -266,7 +259,7 @@ ReadVal	PROC	USES EAX EBX ECX ESI
 		CALL	WriteVal
 		CALL	Crlf
 		
-	RET 28
+	RET 24
 ReadVal	ENDP
 
 ; ***************************************************************
@@ -275,7 +268,7 @@ ReadVal	ENDP
 ;		Push that onto the stack. Track how much stuff is pushed.
 ;		Loop. When the quotient is 0, that is the last digit.
 ;		Pop off each character and call mDisplayString
-; needs: pushedChars
+; needs: value to be written
 ; ***************************************************************
 WriteVal   PROC USES EAX EBX ECX EDX EDI
 	LOCAL	outputLength:DWORD, tempString[12]:BYTE
@@ -336,7 +329,7 @@ WriteVal   PROC USES EAX EBX ECX EDX EDI
 	MOV		EAX, 0
 	STOSB
 
-	; All digits popped off of the stack. Ready to write the string.
+	; Ready to write the string.
 	LEA		EBX, tempString
 	mDisplayString	EBX
 		
@@ -365,7 +358,7 @@ ArrayDisplay	PROC USES ECX ESI
 		LOOP	_showValueAtIndex
 
 	POP		EBP						; Restore EBP
-	RET		20						; De-reference and return
+	RET		16						; De-reference and return
 ArrayDisplay	ENDP
 
 ; ***************************************************************
@@ -394,9 +387,8 @@ CurrentCount	PROC	USES EAX EDX
 	PUSH	EBP						; Preserve EBP
 	MOV		EBP, ESP
 	; Get the counter value from the stack
-	MOV		EAX, [EBP + 12 + 8]
-	; Get the output location from the stack TODO GET RID OF THIS CALL DEPRECATED
-	MOV		EDX, [EBP + 8 + 8]
+	MOV		EAX, [EBP + 8 + 8]
+
 	; Calculate the current line number
 	SUB		EAX, COUNTER_BASE
 	NEG		EAX
@@ -405,7 +397,7 @@ CurrentCount	PROC	USES EAX EDX
 	CALL	WriteVal
 
 	POP		EBP					; Restore EBP
-	RET		8					; De-reference the 2 4-byte offsets on the stack and return
+	RET		4					; De-reference the 2 4-byte offsets on the stack and return
 CurrentCount	ENDP
 ; ***************************************************************
 ; stuff. takes sum and number of entries

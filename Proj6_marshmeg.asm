@@ -74,6 +74,7 @@ inputLength		DWORD	?
 
 validInputs		SDWORD	10 DUP(?)
 average			SDWORD	?
+sum				SDWORD	?
 
 testString		BYTE	"-2147483648",0 
 testValP		SDWORD	2
@@ -112,6 +113,14 @@ main PROC
 	PUSH	LENGTHOF validInputs
 	PUSH	OFFSET validInputs ;8
 	CALL	ArrayDisplay	
+
+	; Show the final values' sum
+	PUSH	TYPE validInputs ;24
+	PUSH	OFFSET sum
+	PUSH	OFFSET finalSumMessage ;16
+	PUSH	LENGTHOF validInputs
+	PUSH	OFFSET validInputs	;8
+	CALL	ArraySum
 
 	INVOKE  ExitProcess, 0		;exit to operating system
 main ENDP
@@ -334,6 +343,7 @@ WriteVal   ENDP
 ; ***************************************************************
 ; stuff. takes array reference and number of entries 
 ; commastring, length, first offset
+; basically works! add comments.
 ; ***************************************************************
 ArrayDisplay	PROC USES ECX ESI 
 	PUSH	EBP						; Preserve EBP
@@ -359,26 +369,35 @@ ArrayDisplay	PROC USES ECX ESI
 	PUSH	[ESI]
 	CALL	WriteVal
 	POP		EBP						; Restore EBP
-	RET		20						; De-reference and return
+	RET		24						; De-reference and return
 ArrayDisplay	ENDP
 
 ; ***************************************************************
 ; stuff. takes array reference and number of entries to sum (for EC 1)
 ; message, length, first offset
 ; ***************************************************************
-ArraySum	PROC USES ECX ESI 
+ArraySum	PROC USES EAX ECX ESI 
 	PUSH	EBP						; Preserve EBP
 	MOV		EBP, ESP
 	
 	; Get the first element of the array
-	MOV		ESI, [EBP + 8 + 8]
+	MOV		ESI, [EBP + 8 + 12]
 	; Get the number of elements in the array
-	MOV		ECX, [EBP + 12 + 8]
+	MOV		ECX, [EBP + 12 + 12]
 	; Display the message
-	mDisplayString	[EBP + 16 + 8]
+	mDisplayString	[EBP + 16 + 12]
+
+	MOV		EAX, 0
+	_sumLoop:
+		ADD		EAX, [ESI]
+		ADD		ESI, [EBP + 24 + 12]
+		LOOP	_sumLoop
+	CALL	WriteDec
+	; Store the result -- we'll need it for finding the average
+	; [EBP + 20 + 12]
 
 	POP		EBP						; Restore EBP
-	RET		16						; De-reference the stack and return
+	RET		20						; De-reference the stack and return
 ArraySum	ENDP
 ; ***************************************************************
 ; stuff. prints the line number (for EC 1)

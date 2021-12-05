@@ -54,43 +54,41 @@ MAX_BUFFER		EQU		100
 COUNTER_BASE	EQU		11
 
 .data
-greeting		BYTE	"   Welcome to the String IO Project by Megan Marshall.",13,10
-				BYTE	"-------------------------------------------------------------",13,10
-				BYTE	"**EC 1: Number each line of user input and display a running subtotal of valid inputs.",13,10,13,10
-				BYTE	"This program will ask you for 10 signed decimal integers. Each integer needs to fit in",13,10
-				BYTE	"a 32 bit signed integer. Invalid or non-numeric entries will not be accepted!",13,10,13,10
-				BYTE	"After 10 valid entries have been provided, you will be shown all your valid inputs, their ",13,10
-				BYTE	"sum, and their average value.",13,10,13,10,0
-promptForInput	BYTE	". Please enter a signed integer: ",0
-errorMessage	BYTE	"ERROR: Your entry was not valid or did not fit in a 32 byte signed integer. Please try again.",13,10,0
-resultsMessage	BYTE	13,10,13,10,"You entered these valid numbers: ",13,10,0
-finalSumMessage	BYTE	13,10,"The total sum of your valid entries is: ",0
-avgMessage		BYTE	13,10,"The truncated average of your valid entries is: ",0
-commaString		BYTE	", ",0
+greeting			BYTE	"   Welcome to the String IO Project by Megan Marshall.",13,10
+					BYTE	"-------------------------------------------------------------",13,10
+					BYTE	"**EC 1: Number each line of user input and display a running subtotal of valid inputs.",13,10,13,10
+					BYTE	"This program will ask you for 10 signed decimal integers. Each integer needs to fit in",13,10
+					BYTE	"a 32 bit signed integer. Invalid or non-numeric entries will not be accepted!",13,10,13,10
+					BYTE	"After 10 valid entries have been provided, you will be shown all your valid inputs, their ",13,10
+					BYTE	"sum, and their average value.",13,10,13,10,0
+promptForInput		BYTE	". Please enter a signed integer: ",0
+errorMessage		BYTE	"ERROR: Your entry was not valid or did not fit in a 32 byte signed integer. Please try again.",13,10,0
+resultsMessage		BYTE	13,10,13,10,"You entered these valid numbers: ",13,10,0
+finalSumMessage		BYTE	13,10,"The total sum of your valid entries is: ",0
+avgMessage			BYTE	13,10,"The truncated average of your valid entries is: ",0
+commaString			BYTE	", ",0
+sumMessage			BYTE	"The current subtotal of your valid entries is: ",0
 
 ; String to store unvalidated user input. 
-userInput		BYTE	MAX_BUFFER DUP(?)
-inputLength		DWORD	?
+userInput			BYTE	MAX_BUFFER DUP(?)
+inputLength			DWORD	?
 
-validInputs		SDWORD	10 DUP(?)
-sum				SDWORD	?
+validInputs			SDWORD	10 DUP(?)
+sum					SDWORD	?
 
-testString		BYTE	"-2147483648",0 
-testValP		SDWORD	2
-testValN		SDWORD	-2
+testString			BYTE	"-2147483648",0 
+testValP			SDWORD	2
+testValN			SDWORD	-2
 .code
 main PROC
 	mDisplayString	OFFSET greeting
 
 	; We need to retrieve valid user input ten times
-	; TODO for tsting
-	;MOV		ECX, LENGTHOF validInputs
-	MOV			ECX, 2
+	MOV		ECX, LENGTHOF validInputs
 	; This is where validated numbers will be stored
 	MOV		EDI, OFFSET validInputs
 
 	_getTenNumbers:
-		
 		PUSH	OFFSET userInput 
 		PUSH	OFFSET errorMessage ; 24
 		PUSH	EDI 
@@ -101,7 +99,16 @@ main PROC
 		; Ask the user for valid input
 		CALL	ReadVal
 		
-		; Once valid input is written, EDI gets incremented and we repeat
+		; Once valid input is written, get the running sum
+		PUSH	TYPE validInputs ;24
+		PUSH	OFFSET sum
+		PUSH	OFFSET SumMessage ;16
+		PUSH	LENGTHOF validInputs	;This can actually just be 10 
+		PUSH	OFFSET validInputs	;8
+		CALL	ArraySum
+		CALL	Crlf
+		
+		;EDI gets incremented and we repeat
 		ADD		EDI, TYPE validInputs
 		LOOP	_getTenNumbers
 
@@ -261,12 +268,12 @@ ReadVal	PROC	USES EAX EBX ECX ESI
 		MOV		EDX, [EBP + 20]
 		MOV		[EDX], EBX
 		; TODO all this needs to be cleaned up
-		MOV		EAX, EBX
-		CALL	WriteDec
-		CALL	CRLF
-		PUSH	EBX
-		CALL	WriteVal
-		CALL	Crlf
+		;MOV		EAX, EBX
+		;CALL	WriteDec
+		;CALL	CRLF
+		;PUSH	EBX
+		;CALL	WriteVal
+		;CALL	Crlf
 		
 	RET 24
 ReadVal	ENDP
@@ -441,7 +448,7 @@ TruncatedAverage	PROC	USES EAX EBX EDX
 	MOV		EBX, [EBP + 12 + 12]
 	; Find the truncated average -- just ignore the remainder
 	IDIV	EBX
-	; Display the message
+	; Display the message and truncated average!
 	mDisplayString [EBP + 8 + 12]
 	PUSH	EAX
 	CALL	WriteVal

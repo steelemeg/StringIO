@@ -66,6 +66,7 @@ errorMessage	BYTE	"ERROR: Your entry was not valid or did not fit in a 32 byte s
 resultsMessage	BYTE	13,10,13,10,"You entered these valid numbers: ",13,10,0
 finalSumMessage	BYTE	13,10,"The total sum of your valid entries is: ",0
 avgMessage		BYTE	13,10,"The truncated average of your valid entries is: ",0
+commaString		BYTE	", ",0
 
 ; String to store unvalidated user input. 
 userInput		BYTE	MAX_BUFFER DUP(?)
@@ -105,19 +106,13 @@ main PROC
 		LOOP	_getTenNumbers
 
 	; Show the array
+	PUSH	OFFSET commaString ;24
 	PUSH	TYPE validInputs
-	PUSH	OFFSET resultsMessage
+	PUSH	OFFSET resultsMessage ;16
 	PUSH	LENGTHOF validInputs
-	PUSH	OFFSET validInputs
+	PUSH	OFFSET validInputs ;8
 	CALL	ArrayDisplay	
-	CALL	CRLF
-	PUSH	testValN
-	CALL	WriteVal
-	CALL	CRLF
 
-	PUSH	testValP
-	CALL	WriteVal
-	CALL	CRLF
 	INVOKE  ExitProcess, 0		;exit to operating system
 main ENDP
 
@@ -338,7 +333,7 @@ WriteVal   ENDP
 
 ; ***************************************************************
 ; stuff. takes array reference and number of entries 
-; string buffer, type, message, length, first offset
+; commastring, length, first offset
 ; ***************************************************************
 ArrayDisplay	PROC USES ECX ESI 
 	PUSH	EBP						; Preserve EBP
@@ -348,6 +343,8 @@ ArrayDisplay	PROC USES ECX ESI
 	MOV		ESI, [EBP + 8 + 8]
 	; Get the number of elements in the array
 	MOV		ECX, [EBP + 12 + 8]
+	; Handle the last element separately since it doesn't need a trailing comma
+	DEC		ECX
 	; Display the message
 	mDisplayString	[EBP + 16 + 8]
 
@@ -355,10 +352,14 @@ ArrayDisplay	PROC USES ECX ESI
 		PUSH	[ESI]
 		CALL	WriteVal
 		ADD		ESI, [EBP + 20 + 8]
+		; Print trailing comma and space
+		mDisplayString	[EBP + 24 + 8]
 		LOOP	_showValueAtIndex
-
+	
+	PUSH	[ESI]
+	CALL	WriteVal
 	POP		EBP						; Restore EBP
-	RET		16						; De-reference and return
+	RET		20						; De-reference and return
 ArrayDisplay	ENDP
 
 ; ***************************************************************

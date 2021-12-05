@@ -1,7 +1,7 @@
 TITLE String IO (Proj6_marshmeg.asm)
 
 ; Author: Megan Marshall
-; Last Modified: December 4, 2021
+; Last Modified: December 5, 2021
 ; OSU email address:marshmeg@oregonstate.edu
 ; Course number/section:   CS271 Section 400
 ; Project Number: 6               Due Date: December 5, 2021
@@ -11,12 +11,25 @@ TITLE String IO (Proj6_marshmeg.asm)
 
 INCLUDE Irvine32.inc
 
-; Macros!
+; ---------------------------------------------------------------------------------
+; Name: mGetString
+;
+; Gets user's keyboard input and writes it to a memory location.
+;
+; Preconditions: None
+;
+; Postconditions: None . Restores original values of all registers used.
+;
+; Receives:	promptMessage = array/string address containing an appropriate message
+;			inputString = array/string address where the user input should be stored
+;			maxLength = value specifying the max number of bytes to accept from the user
+;			bytesRead = address of the DWORD where the number of bytes entered should be stored
+;
+; Returns: Writes user input into the address of inputString. 
+;			Writes the number of bytes entered into the memory location of bytesRead.
+; ---------------------------------------------------------------------------------
+
 mGetString MACRO promptMessage, inputString, maxLength, bytesRead
-; Display a prompt (input parameter, by reference), then get the user’s keyboard input into a memory location (output parameter, by reference).
-;You may also need to provide a count (input parameter, by value) for the length of input string you can accommodate and a provide a number of bytes read 
-;(output parameter, by reference) by the macro.
-	
 	PUSH	EAX
 	PUSH	ECX
 	PUSH	EDX
@@ -35,8 +48,20 @@ mGetString MACRO promptMessage, inputString, maxLength, bytesRead
 	POP		EAX
 ENDM
 
+; ---------------------------------------------------------------------------------
+; Name: mDisplayString
+;
+; Displays the string at the specified offset.
+;
+; Preconditions: None
+;
+; Postconditions: Restores original values of all registers used.
+;
+; Receives:	printTarget = array/string address containing an appropriate message
+;
+; Returns: Prints the string at the specified address.
+; ---------------------------------------------------------------------------------
 mDisplayString MACRO printTarget
-;Print the string which is stored in a specified memory location (input parameter, by reference).
 	PUSH	EDX
 	MOV		EDX, printTarget
 	CALL	WriteString

@@ -79,7 +79,7 @@ MAX_BUFFER		EQU		100
 COUNTER_BASE	EQU		11
 
 .data
-greeting			BYTE	"   Welcome to the String IO Project by Megan Marshall.",13,10
+greetingMessage		BYTE	"   Welcome to the String IO Project by Megan Marshall.",13,10
 					BYTE	"-------------------------------------------------------------",13,10
 					BYTE	"**EC 1: Number each line of user input and display a running subtotal of valid inputs.",13,10,13,10
 					BYTE	"This program will ask you for 10 signed decimal integers. Each integer needs to fit in",13,10
@@ -93,73 +93,72 @@ finalSumMessage		BYTE	13,10,"The total sum of your valid entries is: ",0
 avgMessage			BYTE	13,10,"The truncated average of your valid entries is: ",0
 commaString			BYTE	", ",0
 sumMessage			BYTE	"The current subtotal of your valid entries is: ",0
+farewellMessage		BYTE	13,10,13,10,"Hope you enjoyed this program! Goodbye!",0
 
-; String to store unvalidated user input. 
 userInput			BYTE	MAX_BUFFER DUP(?)
 inputLength			DWORD	?
 
 validInputs			SDWORD	10 DUP(?)
 sum					SDWORD	?
 
-testString			BYTE	"-2147483648",0 
-testValP			SDWORD	2
-testValN			SDWORD	-2
 .code
 main PROC
-	mDisplayString	OFFSET greeting
+	; Greet the user and explain the purpose of the program
+	mDisplayString	OFFSET greetingMessage
 
 	; We need to retrieve valid user input ten times
 	MOV		ECX, LENGTHOF validInputs
 	; This is where validated numbers will be stored
 	MOV		EDI, OFFSET validInputs
-
+	
+	; Ask the user for valid input
 	_getTenNumbers:
 		PUSH	OFFSET userInput 
-		PUSH	OFFSET errorMessage ; 24
+		PUSH	OFFSET errorMessage
 		PUSH	EDI 
-		PUSH	OFFSET inputLength ; 16
+		PUSH	OFFSET inputLength
 		PUSH	ECX
-		PUSH	OFFSET promptForInput ; 8
-
-		; Ask the user for valid input
+		PUSH	OFFSET promptForInput
 		CALL	ReadVal
 		
 		; Once valid input is written, get the running sum
-		PUSH	TYPE validInputs ;24
+		PUSH	TYPE validInputs
 		PUSH	OFFSET sum
-		PUSH	OFFSET SumMessage ;16
-		PUSH	LENGTHOF validInputs	;This can actually just be 10 
-		PUSH	OFFSET validInputs	;8
+		PUSH	OFFSET SumMessage
+		PUSH	LENGTHOF validInputs	;This can actually just be 10
+		PUSH	OFFSET validInputs
 		CALL	ArraySum
 		CALL	Crlf
 		
-		;EDI gets incremented and we repeat
+		;EDI gets incremented to move through the array, and we repeat
 		ADD		EDI, TYPE validInputs
 		LOOP	_getTenNumbers
 
-	; Show the array
-	PUSH	OFFSET commaString ;24
+	; Show the user the array of valid inputs
+	PUSH	OFFSET commaString
 	PUSH	TYPE validInputs
-	PUSH	OFFSET resultsMessage ;16
+	PUSH	OFFSET resultsMessage
 	PUSH	LENGTHOF validInputs
-	PUSH	OFFSET validInputs ;8
+	PUSH	OFFSET validInputs
 	CALL	ArrayDisplay	
 
 	; Show the final values' sum
-	PUSH	TYPE validInputs ;24
+	PUSH	TYPE validInputs
 	PUSH	OFFSET sum
-	PUSH	OFFSET finalSumMessage ;16
+	PUSH	OFFSET finalSumMessage
 	PUSH	LENGTHOF validInputs
-	PUSH	OFFSET validInputs	;8
+	PUSH	OFFSET validInputs
 	CALL	ArraySum
 
 	; Show the truncated average
-	PUSH	sum ;16
+	PUSH	sum 
 	PUSH	LENGTHOF validInputs
-	PUSH	OFFSET avgMessage ;8
+	PUSH	OFFSET avgMessage
 	CALL	TruncatedAverage
 
-	INVOKE  ExitProcess, 0		;exit to operating system
+	; Say goodbye to the user and exit
+	mDisplayString	OFFSET farewellMessage
+	INVOKE  ExitProcess, 0		
 main ENDP
 
 ; ***************************************************************

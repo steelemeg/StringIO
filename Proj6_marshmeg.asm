@@ -7,7 +7,11 @@ TITLE String IO (Proj6_marshmeg.asm)
 ; Project Number: 6               Due Date: December 5, 2021
 ; Description: This program uses macros to support string processing and user input/output. It gathers 10 string inputs 
 ;				from the user, validates that they are integers in the correct range, sotres them in an array, and
-;				displays the results, their sum, and their truncated average to the user. 
+;				displays the results, their sum, and their truncated average to the user.
+;
+; **Note for my grader: In procedures that employ the USES directive but do not have LOCAL variables,
+;		I've opted to separate the stack offsets for passed parameters from USES stack offsets.
+;		I found this easier to understand and maintain, but if it is not considered correct please let me know!
 
 INCLUDE Irvine32.inc
 
@@ -34,12 +38,11 @@ mGetString MACRO promptMessage, inputString, maxLength, bytesRead
 	PUSH	ECX
 	PUSH	EDX
 
-	MOV		EDX, promptMessage
-	CALL	WriteString
+	mDisplayString promptMessage
 	MOV		ECX, maxLength
 	MOV		EDX, inputString
 	CALL	ReadString
-	; Track how many characters the user entered.
+	; Track how many characters the user entered. ReadString automatically null terminates.
 	MOV		EDX, bytesRead
 	MOV		[EDX], EAX
 
@@ -102,6 +105,14 @@ validInputs			SDWORD	10 DUP(?)
 sum					SDWORD	?
 
 .code
+
+; ---------------------------------------------------------------------------------
+; Name: main
+;
+; Main procedure - pushes parameters onto the stack and calls other procedures within
+; the program. Contains loop logic for getting 10 inputs from the user.
+;
+; ---------------------------------------------------------------------------------
 main PROC
 	; Greet the user and explain the purpose of the program
 	mDisplayString	OFFSET greetingMessage
@@ -125,7 +136,9 @@ main PROC
 		PUSH	TYPE validInputs
 		PUSH	OFFSET sum
 		PUSH	OFFSET SumMessage
-		PUSH	LENGTHOF validInputs	;This can actually just be 10
+		; This can always be 10--it doesn't matter if the array hasn't been completed,
+		; since the "extra" values will just be zeroes.
+		PUSH	LENGTHOF validInputs	
 		PUSH	OFFSET validInputs
 		CALL	ArraySum
 		CALL	Crlf
@@ -161,13 +174,33 @@ main PROC
 	INVOKE  ExitProcess, 0		
 main ENDP
 
-; ***************************************************************
-; stuff
-; effective range: -2,147,483,648 to 2,147,483,647
-
-; ***************************************************************
-ReadVal	PROC	USES EAX EBX ECX ESI
-	LOCAL	negativeInput:DWORD, currentDigit:DWORD, potentialInput:SDWORD 
+; ---------------------------------------------------------------------------------
+; Name: ReadVal
+;
+; Gets user input. Validates it represents a signed 32 bit integer. 
+;	If not, displays an error message and has the user try again.) 
+;	Saves valid input to a specified memory location.
+; For each entry, displays a line number. After the first input is accepted, displays
+;	the running subtotal after each valid entry.
+;
+; Preconditions: None.
+;
+; Postconditions: None. Restores original value of EBP, restores registers, dereferences passed parameters.
+;
+; Receives:	Offset in memory of array/string where user input will be stored and read from
+;			Offset in memory of array/string containing appropriate error messaging
+;			Offset in memory of where to store validated input
+;			Value corresponding to how many times valid input has been provided
+;			Offset in memory of where to store the size of the user's input
+;			Offset in memory of array/string contianing appropriate prompt messaging
+;
+; Returns:  Writes unvalidated user input into userInput.
+;			Writes the number of bytes corresponding to the size of user input into bytesRead.
+;			Writes validated inputs into the specified address in validInputs.
+; TODO shoudl userInput ebp+28 be a local string? maybe bytesRead ebp + 16too?
+; ---------------------------------------------------------------------------------
+ReadVal	PROC	USES EAX EBX ECX EDX ESI
+	LOCAL	negativeInput:DWORD, currentDigit:DWORD, potentialInput:SDWORD
 	MOV		negativeInput, 0
 
 	_getInput:
@@ -178,9 +211,6 @@ ReadVal	PROC	USES EAX EBX ECX ESI
 		
 		; Use ESI for the source
 		MOV		ESI, [EBP + 28]
-
-		; syntax reminder
-		;MOV		EAX, [EBX]
 
 		; Counter is the number of bytes written by mGetString
 		MOV		EBX, [EBP + 16]
@@ -264,12 +294,10 @@ ReadVal	PROC	USES EAX EBX ECX ESI
 
 		; Move the final value back into EBX and we're ready for the next digit.
 		_nextDigit:
-		MOV		EBX, EAX
-				
+			MOV		EBX, EAX			
 		LOOP	_processString
 
 	; At this point the string has been validated and an integer equivalent built in EBX.
-
 	_checkFinalSize:
 		; Does the final result fit in a SDWORD? Clear the carry flag first to avoid weird bugs
 		CLC
@@ -288,7 +316,7 @@ ReadVal	PROC	USES EAX EBX ECX ESI
 
 	; Store input correctly in the array, and return.
 	_saveResult:
-		; [EBP + 20] is where the array starts
+		; [EBP + 20] is the address of the current index in the validInputs array
 		MOV		EDX, [EBP + 20]
 		MOV		[EDX], EBX
 		; TODO all this needs to be cleaned up
@@ -302,14 +330,19 @@ ReadVal	PROC	USES EAX EBX ECX ESI
 	RET 24
 ReadVal	ENDP
 
-; ***************************************************************
-; stuff
-; Approach: Divide the number by 10. The remainder is the last digit.
-;		Push that onto the stack. Track how much stuff is pushed.
-;		Loop. When the quotient is 0, that is the last digit.
-;		Pop off each character and call mDisplayString
-; needs: value to be written
-; ***************************************************************
+; ---------------------------------------------------------------------------------
+; Name: WriteVal
+;
+; Given a value, converts it to a string and displays via mDisplayString macro.
+;
+; Preconditions: None.
+;
+; Postconditions: None. Restores original value of EBP, restores registers, dereferences passed parameters.
+;
+; Receives:	Value to be written passed on the stack.
+;
+; Returns:  String equivalent calculated and written to the console.
+; ---------------------------------------------------------------------------------
 WriteVal   PROC USES EAX EBX ECX EDX EDI
 	LOCAL	outputLength:DWORD, tempString[12]:BYTE
 	MOV		outputLength, 0
@@ -376,11 +409,24 @@ WriteVal   PROC USES EAX EBX ECX EDX EDI
 	RET		4
 WriteVal   ENDP
 
-; ***************************************************************
-; stuff. takes array reference and number of entries 
-; commastring, length, first offset
-; basically works! add comments.
-; ***************************************************************
+; ---------------------------------------------------------------------------------
+; Name: ArrayDisplay
+;
+; Given an array of numbers, displays their string equivalents to the user.
+; Relies on WriteVal to convert the numbers to strings and display.
+;
+; Preconditions: None.
+;
+; Postconditions: None. Restores original value of EBP, restores registers, dereferences passed parameters.
+;
+; Receives:	Offset in memory of array/string containing comma/space delimiter.
+;			Value corresponding to the bytes per data type in the source array.
+;			Offset in memory of array/string containing appropriate user messaging.
+;			Value corresponding to the number of items in the source array.
+;			Offset in memory of the source array containing inputs. 
+;
+; Returns:  String equivalents calculated and written to the console.
+; ---------------------------------------------------------------------------------
 ArrayDisplay	PROC USES ECX ESI 
 	PUSH	EBP						; Preserve EBP
 	MOV		EBP, ESP
@@ -408,10 +454,24 @@ ArrayDisplay	PROC USES ECX ESI
 	RET		24						; De-reference and return
 ArrayDisplay	ENDP
 
-; ***************************************************************
-; stuff. takes array reference and number of entries to sum (for EC 1)
-; message, length, first offset
-; ***************************************************************
+; ---------------------------------------------------------------------------------
+; Name: ArraySum
+;
+; Given an array of numbers, displays the sum of the contained values.
+; Relies on WriteVal to convert the sum to a string and display.
+;
+; Preconditions: None.
+;
+; Postconditions: None. Restores original value of EBP, restores registers, dereferences passed parameters.
+;
+; Receives:	Value corresponding to the bytes per data type in the source array.
+;			Offset in memory of location to store the final sum.
+;			Offset in memory of array/string containing appropriate user messaging.
+;			Value corresponding to the number of items in the source array.
+;			Offset in memory of the source array containing inputs. 
+;
+; Returns:  Sum of values calculated and written to the console.
+; ---------------------------------------------------------------------------------
 ArraySum	PROC USES EAX ECX ESI 
 	PUSH	EBP						; Preserve EBP
 	MOV		EBP, ESP
@@ -438,10 +498,21 @@ ArraySum	PROC USES EAX ECX ESI
 	RET		20						; De-reference the stack and return
 ArraySum	ENDP
 
-; ***************************************************************
-; stuff. prints the line number (for EC 1)
-; DONE TODO Comments
-; ***************************************************************
+; ---------------------------------------------------------------------------------
+; Name: CurrentCount
+;
+; Determines the current line number and writes it to the console.
+; Relies on WriteVal to convert the number to a string and display.
+; Uses ECX from the main loop; subtracts it from 11 to get the current line number.
+;
+; Preconditions: None.
+;
+; Postconditions: None. Restores original value of EBP, restores registers, dereferences passed parameters.
+;
+; Receives:	Value corresponding to how many times valid input has been provided.
+;
+; Returns:  Line number calculated and written to the console.
+; ---------------------------------------------------------------------------------
 CurrentCount	PROC	USES EAX EDX
 	PUSH	EBP						; Preserve EBP
 	MOV		EBP, ESP
@@ -459,9 +530,23 @@ CurrentCount	PROC	USES EAX EDX
 	RET		4					; De-reference the 2 4-byte offsets on the stack and return
 CurrentCount	ENDP
 
-; ***************************************************************
-; stuff. takes sum and number of entries
-; ***************************************************************
+; ---------------------------------------------------------------------------------
+; Name: Truncated Average
+;
+; Determines the truncated average and writes it to the console.
+; Any fractional part is rounded down and ignored. So 1.2 => 1, 1.9 => 1, etc.
+; Relies on WriteVal to convert the average to a string and display.
+;
+; Preconditions: None.
+;
+; Postconditions: None. Restores original value of EBP, restores registers, dereferences passed parameters.
+;
+; Receives:	Value of the sum (i.e. the dividend when calculating the average)
+;			Number of data points (i.e. the divisor)
+;			Offset in memory of array/string containing appropriate user messaging.
+;
+; Returns:  Truncated average calculated and written to the console.
+; ---------------------------------------------------------------------------------
 TruncatedAverage	PROC	USES EAX EBX EDX
 	PUSH	EBP						; Preserve EBP
 	MOV		EBP, ESP

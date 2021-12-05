@@ -63,6 +63,9 @@ greeting		BYTE	"   Welcome to the String IO Project by Megan Marshall.",13,10
 				BYTE	"sum, and their average value.",13,10,13,10,0
 promptForInput	BYTE	". Please enter a signed integer: ",0
 errorMessage	BYTE	"ERROR: Your entry was not valid or did not fit in a 32 byte signed integer. Please try again.",13,10,0
+resultsMessage	BYTE	13,10,13,10,"You entered these valid numbers: ",13,10,0
+finalSumMessage	BYTE	13,10,"The total sum of your valid entries is: ",0
+avgMessage		BYTE	13,10,"The truncated average of your valid entries is: ",0
 
 ; String to store unvalidated user input. 
 userInput		BYTE	MAX_BUFFER DUP(?)
@@ -76,24 +79,24 @@ displayOutput	BYTE	15 DUP(?)
 pushedChars		DWORD	0
 
 testString		BYTE	"-2147483648",0 
-testValP		SDWORD	25354760
-testValN		SDWORD	-25354760
+testValP		SDWORD	2
+testValN		SDWORD	-2
 .code
 main PROC
 	mDisplayString	OFFSET greeting
 
 	; We need to retrieve valid user input ten times
-	MOV		ECX, 10
+	; TODO for tsting
+	;MOV		ECX, LENGTHOF validInputs
+	MOV			ECX, 2
 	; This is where validated numbers will be stored
 	MOV		EDI, OFFSET validInputs
-	_getTenNumbers:
 
-		MOV		EDI, OFFSET validInputs
-		
+	_getTenNumbers:
 		PUSH	OFFSET promptForInput ; 32
 		PUSH	OFFSET userInput 
 		PUSH	OFFSET errorMessage ; 24
-		PUSH	[EDI] 
+		PUSH	EDI 
 		PUSH	OFFSET inputLength ; 16
 		PUSH	ECX
 		PUSH	OFFSET displayOutput ; 8
@@ -101,14 +104,26 @@ main PROC
 		; Ask the user for valid input
 		CALL	ReadVal
 		
-		; loop goes here, EDI gets incremented
+		; Once valid input is written, EDI gets incremented and we repeat
+		ADD		EDI, TYPE validInputs
 		LOOP	_getTenNumbers
 
+	; Show the array
+	; TODO GET RID OF THIS
+	PUSH	OFFSET displayOutput
+	PUSH	TYPE validInputs
+	PUSH	OFFSET resultsMessage
+	PUSH	LENGTHOF validInputs
+	PUSH	OFFSET validInputs
+	CALL	ArrayDisplay	
+	CALL	CRLF
+	PUSH	testValN
+	CALL	WriteVal
+	CALL	CRLF
 
-		
-	;PUSH	testValN
-	;PUSH	OFFSET displayOutput
-	;CALL	WriteVal
+	PUSH	testValP
+	CALL	WriteVal
+	CALL	CRLF
 	INVOKE  ExitProcess, 0		;exit to operating system
 main ENDP
 
@@ -180,6 +195,7 @@ ReadVal	PROC	USES EAX EBX ECX ESI
 		; If the first character wasn't '-' or '+', reset ESI to the first character in the string.
 		MOV		ESI, [EBP + 28]
 
+	;TODO turns out my logic is still wrong
 	_processString:
 		XOR		EAX, EAX
 		LODSB
@@ -237,19 +253,20 @@ ReadVal	PROC	USES EAX EBX ECX ESI
 		CMP		EBX, MAX_POS_VALUE
 		JA		_error
 
-	;TODO increment validCount, store input correctly in the array, and return if the input was valid. Otherwise start over.
+	; Store input correctly in the array, and return.
 	_saveResult:
-		; TODO next mess on the horizon: how to move through the validInputs array in main and pass the address in 
-		; Increase validCount by 1. Future work--find a neater way to do this
-		; Look up stack input output parameter references
-		; TODO testing
 		; [EBP + 20] is where the array starts
-		MOV		[EBP + 20], EBX
-		MOV		EAX, potentialInput
+		MOV		EDX, [EBP + 20]
+		MOV		[EDX], EBX
+		; TODO all this needs to be cleaned up
+		MOV		EAX, EBX
 		CALL	WriteDec
-		CALL CRLF
+		CALL	CRLF
+		PUSH	EBX
+		CALL	WriteVal
+		CALL	Crlf
 		
-	RET
+	RET 28
 ReadVal	ENDP
 
 ; ***************************************************************
@@ -258,16 +275,16 @@ ReadVal	ENDP
 ;		Push that onto the stack. Track how much stuff is pushed.
 ;		Loop. When the quotient is 0, that is the last digit.
 ;		Pop off each character and call mDisplayString
-; needs: pushedChars, address of result string
+; needs: pushedChars
 ; ***************************************************************
 WriteVal   PROC USES EAX EBX ECX EDX EDI
-	LOCAL	outputLength:DWORD
+	LOCAL	outputLength:DWORD, tempString[12]:BYTE
 	MOV		outputLength, 0
 	
 	; Get the value to be written
-	MOV		EAX, [EBP + 12]
+	MOV		EAX, [EBP + 8]
 	; Get the offset of the output string
-	MOV		EDI, [EBP + 8]
+	LEA		EDI, tempString
 
 	; Is the value negative?
 	TEST	EAX, 80000000h
@@ -315,19 +332,60 @@ WriteVal   PROC USES EAX EBX ECX EDX EDI
 		STOSB
 		LOOP	_buildString
 
+	; Add a null-terminator because there's all sorts of mess on the stack.
+	MOV		EAX, 0
+	STOSB
+
 	; All digits popped off of the stack. Ready to write the string.
-	mDisplayString	OFFSET displayOutput
+	LEA		EBX, tempString
+	mDisplayString	EBX
 		
-	RET		8
+	RET		4
 WriteVal   ENDP
 
 ; ***************************************************************
-; stuff. takes array reference and number of entries to sum (for EC 1)
+; stuff. takes array reference and number of entries 
+; string buffer, type, message, length, first offset
 ; ***************************************************************
-ArraySum	PROC
-	RET
-ArraySum	ENDP
+ArrayDisplay	PROC USES ECX ESI 
+	PUSH	EBP						; Preserve EBP
+	MOV		EBP, ESP
+	
+	; Get the first element of the array
+	MOV		ESI, [EBP + 8 + 8]
+	; Get the number of elements in the array
+	MOV		ECX, [EBP + 12 + 8]
+	; Display the message
+	mDisplayString	[EBP + 16 + 8]
 
+	_showValueAtIndex:
+		PUSH	[ESI]
+		CALL	WriteVal
+		ADD		ESI, [EBP + 20 + 8]
+		LOOP	_showValueAtIndex
+
+	POP		EBP						; Restore EBP
+	RET		20						; De-reference and return
+ArrayDisplay	ENDP
+
+; ***************************************************************
+; stuff. takes array reference and number of entries to sum (for EC 1)
+; message, length, first offset
+; ***************************************************************
+ArraySum	PROC USES ECX ESI 
+	PUSH	EBP						; Preserve EBP
+	MOV		EBP, ESP
+	
+	; Get the first element of the array
+	MOV		ESI, [EBP + 8 + 8]
+	; Get the number of elements in the array
+	MOV		ECX, [EBP + 12 + 8]
+	; Display the message
+	mDisplayString	[EBP + 16 + 8]
+
+	POP		EBP						; Restore EBP
+	RET		16						; De-reference the stack and return
+ArraySum	ENDP
 ; ***************************************************************
 ; stuff. prints the line number (for EC 1)
 ; DONE TODO Comments
@@ -337,14 +395,13 @@ CurrentCount	PROC	USES EAX EDX
 	MOV		EBP, ESP
 	; Get the counter value from the stack
 	MOV		EAX, [EBP + 12 + 8]
-	; Get the output location from the stack
+	; Get the output location from the stack TODO GET RID OF THIS CALL DEPRECATED
 	MOV		EDX, [EBP + 8 + 8]
 	; Calculate the current line number
 	SUB		EAX, COUNTER_BASE
 	NEG		EAX
-	; Pass the value and the output offset off to WriteVal
+	; Pass the value off to WriteVal
 	PUSH	EAX
-	PUSH	EDX
 	CALL	WriteVal
 
 	POP		EBP					; Restore EBP

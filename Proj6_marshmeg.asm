@@ -77,8 +77,6 @@ ASCII_PLUS		=		2Bh
 ASCII_ZERO		=		30h
 ASCII_NINE		=		39h
 ASCII_BASE		=		30h
-MAX_POS_VALUE	=		2147483647
-MAX_ABS_VALUE	=		2147483648
 MAX_BUFFER		=		100
 COUNTER_BASE	=		11
 
@@ -307,155 +305,16 @@ ReadVal	PROC	USES EAX EBX ECX EDX ESI
 		ADD		potentialInput, EBX
 
 		JO		_error	
-		; This is a bit of a mess. When moving an over-large positive number into potentialInput, no flags were being set,
-		; and the value simply overflowed to negative numbers. Workaround: Check if the value was supposed to be negative, 
-		; then if not, check if unsigned EBX exceeded 2^31 -1
-		MOV		EAX, negativeInput
-		CMP		EAX, 1
-		JE		_saveResult
-		CMP		EBX, MAX_POS_VALUE
-		JA		_error
 
 	; Store input correctly in the array, and return.
 	_saveResult:
 		; [EBP + 20] is the address of the current index in the validInputs array
 		MOV		EDX, [EBP + 20]
 		MOV		[EDX], EBX
-		; TODO all this needs to be cleaned up
-		;MOV		EAX, EBX
-		;CALL	WriteDec
-		;CALL	CRLF
-		;PUSH	EBX
-		;CALL	WriteVal
-		;CALL	Crlf
 		
 	RET 24
 ReadVal	ENDP
 
-ReadValA	PROC	USES EAX EBX ECX EDX ESI
-	LOCAL	negativeInput:DWORD, currentDigit:DWORD, potentialInput:SDWORD
-	MOV		negativeInput, 0
-
-	_getInput:
-		; Get user input written as a string into userInput. Size will be in inputLength.
-		PUSH	[EBP + 12]
-		CALL	CurrentCount
-		mGetString [EBP + 8], [EBP + 28], MAX_BUFFER, [EBP + 16]
-		
-		; Use ESI for the source
-		MOV		ESI, [EBP + 28]
-
-		; Counter is the number of bytes written by mGetString
-		MOV		EBX, [EBP + 16]
-		MOV		ECX, [EBX]
-
-		; EBX will be used to track the value as it's validated and built.
-		MOV		EBX, 0	
-		; If the user enters nothing (empty input), display an error and re-prompt.
-		CMP		ECX, 0
-		JE		_error
-		JMP		_checkSign
-
-	_error:
-		; Display error message
-		mDisplayString	[EBP + 24]
-
-		; Clear out EAX, reset EBX, and prompt the user for new input.
-		XOR		EAX, EAX
-		MOV		EBX, 0
-		JMP		_getInput
-
-	; Check if the first character is '-' or '+'
-	_checkSign:
-		LODSB
-		CMP		AL, ASCII_MINUS
-		JE		_negative
-		CMP		AL, ASCII_PLUS
-		JE		_positive
-		JMP		_unsigned
-
-	_negative:
-		MOV		negativeInput, 1
-		DEC		ECX
-		JMP		_processString
-	_positive:
-		MOV		negativeInput, 0
-		DEC		ECX
-		JMP		_processString
-	_unsigned:
-		MOV		negativeInput, 0
-		; If the first character wasn't '-' or '+', reset ESI to the first character in the string.
-		MOV		ESI, [EBP + 28]
-
-	; Pre-check: if there are more than 10 characters, there's no way it will fit. (Sign flag already processed)
-		;CMP		ECX, 10
-		;JA		_error
-		
-	_processString:
-		XOR		EAX, EAX
-		LODSB
-		; Validate! Is the character a sigit between 0 and 9?
-		CMP		AL, ASCII_ZERO
-		JB		_error
-		CMP		AL, ASCII_NINE
-		JA		_error
-
-		; If the character was valid, convert the ASCII value to hex value by subtracting 30h.
-		SUB		AL, ASCII_BASE
-		; Stash this value in currentDigit for the time being
-		MOV		currentDigit, EAX
-		; Then multiply the existing value of EBX by 10 and add or subtract the newest digit, depending on the sign.
-		MOV		EAX, EBX
-		MOV		EBX, 10
-		MUL		EBX
-		JO		_error
-		JC		_error
-		
-		ADD		EAX, currentDigit
-		;JO		_error
-		JC		_error
-		; Extra check for wraparound overflows -- did the value go negative? At this point we're unsigned and 
-		; working with the absolute value.
-		CMP		EAX, 0	
-		JB		_error
-		CMP		EAX, MAX_ABS_VALUE
-		JA		_error
-
-		; Move the final value back into EBX and we're ready for the next digit.
-		MOV		EBX, EAX			
-		LOOP	_processString
-
-	; At this point the string has been validated and an integer equivalent built in EBX.
-	_checkFinalSize:
-		; Does the final result fit in a SDWORD? Clear the carry flag first to avoid weird bugs
-		CLC
-		MOV		potentialInput, 0
-		ADD		potentialInput, EBX
-
-		JO		_error	
-		; Check if the value was supposed to be negative, then if not, check if unsigned EBX exceeded 2^31 -1
-		MOV		EAX, negativeInput
-		CMP		EAX, 1
-		JE		_negativeFinalValue
-		JMP		_positiveFinalValue
-
-		_negativeFinalValue:
-			NEG		EBX
-			CMP		EBX, 0
-			JNS		_error
-			JMP		_saveResult
-
-		_positiveFinalValue:
-			CMP		EBX, MAX_POS_VALUE
-			JA		_error
-
-	; Store input correctly in the array, and return.
-	_saveResult:
-		; [EBP + 20] is the address of the current index in the validInputs array
-		MOV		EDX, [EBP + 20]
-		MOV		[EDX], EBX		
-	RET 24
-ReadValA	ENDP
 ; ---------------------------------------------------------------------------------
 ; Name: WriteVal
 ;

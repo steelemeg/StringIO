@@ -1,4 +1,4 @@
-Microsoft (R) Macro Assembler Version 14.29.30133.0	    12/05/21 19:33:06
+Microsoft (R) Macro Assembler Version 14.29.30133.0	    12/05/21 19:55:43
 String IO (Proj6_marshmeg.asm				     Page 1 - 1
 
 
@@ -328,8 +328,8 @@ Microsoft (R) Macro Assembler Version 14.29.30133.0	    12/05/21 19:33:06
  00000031  6A 04				PUSH	TYPE validInputs
  00000033  68 000003EF R			PUSH	OFFSET sum
  00000038  68 00000303 R			PUSH	OFFSET SumMessage
-						; This can always be 10--it doesn't matter if the array hasn't been completed,
-						; since the "extra" values will just be zeroes.
+						; The array length can always bee 10--it doesn't matter if the array hasn't 
+						; been completed, since the "extra" values will just be zeroes.
  0000003D  6A 0A				PUSH	LENGTHOF validInputs	
  0000003F  68 000003C7 R			PUSH	OFFSET validInputs
  00000044  E8 000001E8				CALL	ArraySum
@@ -412,7 +412,7 @@ Microsoft (R) Macro Assembler Version 14.29.30133.0	    12/05/21 19:33:06
 	   00000000
 
  000000BA				_getInput:
-						; Get user input written as a string into userInput. Size will be in inputLength.
+						; Get user input written as a string into userInput. Size will be written into inputLength.
  000000BA  FF 75 0C				PUSH	[EBP + 12]
  000000BD  E8 000001A3				CALL	CurrentCount
 						mGetString [EBP + 8], [EBP + 28], MAX_BUFFER, [EBP + 16]
@@ -534,7 +534,6 @@ Microsoft (R) Macro Assembler Version 14.29.30133.0	    12/05/21 19:33:06
  0000016E  C7 45 F4				MOV		potentialInput, 0
 	   00000000
  00000175  01 5D F4				ADD		potentialInput, EBX
-
  00000178  0F 80 FFFFFF7A			JO		_error	
 
 					; Store input correctly in the array, and return.
@@ -580,7 +579,7 @@ Microsoft (R) Macro Assembler Version 14.29.30133.0	    12/05/21 19:33:06
 					
 					; Get the value to be written
  0000019E  8B 45 08			MOV		EAX, [EBP + 8]
-					; Get the offset of the output string
+					; Get the offset of the output string -- needed to use LEA with the local variable
  000001A1  8D 7D F0			LEA		EDI, tempString
 
 					; Is the value negative?
@@ -744,11 +743,13 @@ Microsoft (R) Macro Assembler Version 14.29.30133.0	    12/05/21 19:33:06
  00000241  E8 00000000 E     1		CALL	WriteString
  00000246  5A		     1		POP		EDX
 
+					; Step through the array, storing the summed values in EAX.
  00000247  B8 00000000			MOV		EAX, 0
  0000024C				_sumLoop:
  0000024C  03 06				ADD		EAX, [ESI]
  0000024E  03 75 24				ADD		ESI, [EBP + 24 + 12]
  00000251  E2 F9				LOOP	_sumLoop
+					; Print the total result.
  00000253  50				PUSH	EAX
  00000254  E8 FFFFFF33			CALL	WriteVal
 					; Store the result -- we'll need it for finding the average
@@ -845,7 +846,7 @@ Microsoft (R) Macro Assembler Version 14.29.30133.0	    12/05/21 19:33:06
  000002A4			TruncatedAverage	ENDP
 
 				END main
-Microsoft (R) Macro Assembler Version 14.29.30133.0	    12/05/21 19:33:06
+Microsoft (R) Macro Assembler Version 14.29.30133.0	    12/05/21 19:55:43
 String IO (Proj6_marshmeg.asm				     Symbols 2 - 1
 
 

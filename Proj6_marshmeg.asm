@@ -135,8 +135,8 @@ main PROC
 		PUSH	TYPE validInputs
 		PUSH	OFFSET sum
 		PUSH	OFFSET SumMessage
-		; This can always be 10--it doesn't matter if the array hasn't been completed,
-		; since the "extra" values will just be zeroes.
+		; The array length can always bee 10--it doesn't matter if the array hasn't 
+		; been completed, since the "extra" values will just be zeroes.
 		PUSH	LENGTHOF validInputs	
 		PUSH	OFFSET validInputs
 		CALL	ArraySum
@@ -204,7 +204,7 @@ ReadVal	PROC	USES EAX EBX ECX EDX ESI
 	MOV		negativeInput, 0
 
 	_getInput:
-		; Get user input written as a string into userInput. Size will be in inputLength.
+		; Get user input written as a string into userInput. Size will be written into inputLength.
 		PUSH	[EBP + 12]
 		CALL	CurrentCount
 		mGetString [EBP + 8], [EBP + 28], MAX_BUFFER, [EBP + 16]
@@ -303,7 +303,6 @@ ReadVal	PROC	USES EAX EBX ECX EDX ESI
 		CLC
 		MOV		potentialInput, 0
 		ADD		potentialInput, EBX
-
 		JO		_error	
 
 	; Store input correctly in the array, and return.
@@ -334,7 +333,7 @@ WriteVal   PROC USES EAX EBX ECX EDX EDI
 	
 	; Get the value to be written
 	MOV		EAX, [EBP + 8]
-	; Get the offset of the output string
+	; Get the offset of the output string -- needed to use LEA with the local variable
 	LEA		EDI, tempString
 
 	; Is the value negative?
@@ -469,11 +468,13 @@ ArraySum	PROC USES EAX ECX ESI
 	; Display the message
 	mDisplayString	[EBP + 16 + 12]
 
+	; Step through the array, storing the summed values in EAX.
 	MOV		EAX, 0
 	_sumLoop:
 		ADD		EAX, [ESI]
 		ADD		ESI, [EBP + 24 + 12]
 		LOOP	_sumLoop
+	; Print the total result.
 	PUSH	EAX
 	CALL	WriteVal
 	; Store the result -- we'll need it for finding the average

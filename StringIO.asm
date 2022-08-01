@@ -1,15 +1,12 @@
-TITLE String IO (Proj6_marshmeg.asm)
+TITLE String IO 
 
-; Author: Megan Marshall
+; Author: Megan Steele
 ; Last Modified: December 5, 2021
-; OSU email address:marshmeg@oregonstate.edu
-; Course number/section:   CS271 Section 400
-; Project Number: 6               Due Date: December 5, 2021
 ; Description: This program uses macros to support string processing and user input/output. It gathers 10 string inputs 
 ;				from the user, validates that they are integers in the correct range, sotres them in an array, and
 ;				displays the results, their sum, and their truncated average to the user.
 ;
-; **Note for my grader: In procedures that employ the USES directive but do not have LOCAL variables,
+; Note: In procedures that employ the USES directive but do not have LOCAL variables,
 ;		I've opted to separate the stack offsets for passed parameters from USES stack offsets.
 ;		I found this easier to understand and maintain, but if it is not considered correct please let me know!
 
@@ -58,7 +55,7 @@ ENDM
 ;
 ; Preconditions: None
 ;
-; Postconditions: Restores original values of all registers used.
+; Postconditions: None. Restores original values of all registers used.
 ;
 ; Receives:	printTarget = array/string address containing an appropriate message
 ;
@@ -81,7 +78,7 @@ MAX_BUFFER		=		100
 COUNTER_BASE	=		11
 
 .data
-greetingMessage		BYTE	"   Welcome to the String IO Project by Megan Marshall.",13,10
+greetingMessage		BYTE	"   Welcome to the String IO Project by Steele",13,10
 					BYTE	"-------------------------------------------------------------",13,10
 					BYTE	"**EC 1: Number each line of user input and display a running subtotal of valid inputs.",13,10,13,10
 					BYTE	"This program will ask you for 10 signed decimal integers. Each integer needs to fit in",13,10
@@ -99,7 +96,6 @@ farewellMessage		BYTE	13,10,13,10,"Hope you enjoyed this program! Goodbye!",0
 
 userInput			BYTE	MAX_BUFFER DUP(?)
 inputLength			DWORD	?
-
 validInputs			SDWORD	10 DUP(?)
 sum					SDWORD	?
 
@@ -202,7 +198,6 @@ main ENDP
 ReadVal	PROC	USES EAX EBX ECX EDX ESI
 	LOCAL	negativeInput:DWORD, currentDigit:DWORD, potentialInput:SDWORD
 	MOV		negativeInput, 0
-
 	_getInput:
 		; Get user input written as a string into userInput. Size will be written into inputLength.
 		PUSH	[EBP + 12]
@@ -345,13 +340,13 @@ WriteVal   PROC USES EAX EBX ECX EDX EDI
 		; If the value is negative, go ahead and add a leading '-' to the output.
 		; Then get the absolute value of EAX before we start determining the number's digits.
 		NEG		EAX
-		; Need to use AL for a minute, so stash the value in EBX.
-		MOV		EBX, EAX
+		; Need to use AL for a minute, so stash the value on the stack.
+		PUSH	EAX
 		MOV		EAX, 0
 		MOV		AL, ASCII_MINUS		
 		STOSB
 		; Note: Don't increment outputLength here, since nothing is winding up on the stack.
-		MOV		EAX, EBX
+		POP		EAX
 
 	_outputDigits:
 		; Opting to not display a positive sign for non-negative integers.
@@ -506,7 +501,7 @@ CurrentCount	PROC	USES EAX EDX
 	; Get the counter value from the stack
 	MOV		EAX, [EBP + 8 + 8]
 
-	; Calculate the current line number
+	; Calculate the current line number by subtracting the loop counter from 11
 	SUB		EAX, COUNTER_BASE
 	NEG		EAX
 	; Pass the value off to WriteVal
